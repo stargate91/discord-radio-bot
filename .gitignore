@@ -4,4 +4,4 @@ pycache/
 Thumbs.db
 radio.db
 config2.json
-radio_message_id
+radio_message_id.json
