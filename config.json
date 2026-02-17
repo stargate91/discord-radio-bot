@@ -1,73 +1,12 @@
 {
-    "token": "MTQ3MzA2ODg4ODA1NTg3MzY5Nw.GfuVuv.k-9Sc9wq2cbq4GzdO_FIc1aIFinjjRD8PJDhGI",
-    "guild_id": 1083433370815582240,
-    "voice_channel_id": 1473070582776987812,
-    "radio_text_channel_id": 1473081201274392780,
-    "radio_message_id": 1473349763645833420,
-    "default_genre": "Drum & Bass & Jungle",
-    "genres": {
-        "Drum & Bass & Jungle": [
-            "F:/music/dnb_dubs",
-            "F:/music/dnb_freebies",
-            "F:/music/dnb_labels",
-            "F:/music/dnb_releases"
-        ],
-        "IDM & Ambient": [
-            "F:/music/idm_ambient_experimental_labels",
-            "F:/music/idm_ambient_experimental_releases"
-        ],
-        "Techno": [
-            "F:/music/techno_labels",
-            "F:/music/techno_releases"
-        ],
-        "Hardcore Gabber": [
-            "F:/music/hardcore_labels",
-            "F:/music/hardcore_releases"
-        ],
-        "Dubstep & Garage": [
-            "F:/music/dub_dubstep_garage_grime_labels",
-            "F:/music/dub_dubstep_garage_grime_releases"
-        ],
-        "Breakbeat": [
-            "F:/music/breakbeat_labels",
-            "F:/music/breakbeat_releases"
-        ],
-        "Vault - Rare Music": [
-            "F:/music/_bandcamp_beatport_flac",
-            "F:/music/_dubpack_usb",
-            "F:/music/_secret",
-            "E:/music/_bandcamp_beatport_lossy"
-        ],
-        "DJ Mixes": [
-            "E:/music/_mixes"
-        ],
-        "Misc (From Downtempo to Folk)": [
-            "E:/music/_to_be_sorted",
-            "E:/music/misc"
-        ],
-        "Alternative & Indie": [
-            "E:/music/alternative_indie_rock_and_pop"
-        ],
-        "Film & Movie Music": [
-            "E:/music/film_game_music"
-        ],
-        "Goa & Psy-Trance": [
-            "E:/music/goa_psy"
-        ],
-        "Pop": [
-            "E:/music/guilty_pleasures_pop"
-        ],
-        "House & Trance": [
-            "E:/music/house_trance"
-        ],
-        "Industrial EBM": [
-            "E:/music/industrial_ebm"
-        ],
-        "Rock & Metal": [
-            "E:/music/metal_hardcore_rock"
-        ],
-        "Oldies": [
-            "E:/music/oldies_50_80s"
-        ]
-    }
+  "token": "YOUR_DISCORD_BOT_TOKEN",
+  "guild_id": 123456789012345678,
+  "voice_channel_id": 123456789012345678,
+  "radio_text_channel_id": 123456789012345678,
+  "default_genre": "Drum & Bass & Jungle",
+  "ffmpeg_path": "ffmpeg",
+  "genres": {
+    "Drum & Bass & Jungle": ["E:/music/dnb"],
+    "IDM & Ambient": ["E:/music/idm"]
+  }
 }

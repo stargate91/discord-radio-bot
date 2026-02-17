@@ -3,5 +3,5 @@ pycache/
 .DS_Store
 Thumbs.db
 radio.db
-config2.json
+config_r.json
 radio_message_id.json
