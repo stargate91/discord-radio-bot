@@ -198,7 +198,6 @@ def get_next_song(genre):
     if not song:
         return None
 
-    # 4️⃣ Statisztika frissítés
     cursor.execute("""
         UPDATE songs
         SET play_count = play_count + 1,
@@ -234,6 +233,20 @@ async def ensure_voice():
 
     is_reconnecting = False
     return True
+
+# ================= RADIO MESSAGE PERSIST =================
+
+RADIO_MESSAGE_FILE = "radio_message_id.json"
+
+def save_radio_message_id(message_id):
+    with open(RADIO_MESSAGE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"id": message_id}, f)
+
+def load_radio_message_id():
+    if not os.path.exists(RADIO_MESSAGE_FILE):
+        return None
+    with open(RADIO_MESSAGE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f).get("id")
 
 # ================= RADIO UI =================
 
@@ -280,6 +293,26 @@ async def update_radio_message(force=False):
 
     LAST_UI_UPDATE = now
     await radio_message.edit(embed=build_radio_embed(), view=RadioView())
+
+async def radio_message_refresher():
+    global radio_message
+
+    await bot.wait_until_ready()
+
+    while not bot.is_closed():
+        await asyncio.sleep(58 * 60)
+
+        try:
+            if radio_message:
+                await radio_message.delete()
+        except:
+            pass
+
+        radio_message = await radio_text_channel.send(
+            embed=build_radio_embed(),
+            view=RadioView()
+        )
+
 
 # ================= PLAYBACK =================
 
@@ -397,11 +430,18 @@ async def on_ready():
     print("Bejelentkezve:", bot.user)
 
     if is_db_empty():
-        print("Adatbázis üres → importálás...")
         for g in config["genres"]:
             await asyncio.to_thread(import_genre_to_db, g)
 
     radio_text_channel = bot.get_channel(RADIO_TEXT_CHANNEL_ID)
+
+    old_id = load_radio_message_id()
+    if old_id:
+        try:
+            old_msg = await radio_text_channel.fetch_message(old_id)
+            await old_msg.delete()
+        except:
+            pass
 
     await ensure_voice()
 
@@ -409,8 +449,11 @@ async def on_ready():
         embed=build_radio_embed(),
         view=RadioView()
     )
+    save_radio_message_id(radio_message.id)
 
     await play_next()
+    bot.loop.create_task(radio_message_refresher())
+
 
 @bot.event
 async def on_voice_state_update(member, before, after):
