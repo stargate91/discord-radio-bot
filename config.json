@@ -1,0 +1,12 @@
+{
+    "token": "Discord app token",
+    "guild_id": "Server id",
+    "voice_channel_id": "Voice channel id",
+    "radio_text_channel_id": "Radio text channel id",
+    "default_genre": "Your default genre",
+    "genres": {
+        "Electronic": [
+            "C:/music/electronic"
+        ]
+    }
+}

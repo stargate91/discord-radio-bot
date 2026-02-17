@@ -1,0 +1,6 @@
+pycache/
+*.py[cod]
+.DS_Store
+Thumbs.db
+radio.db
+config2.json
