@@ -1,7 +1,7 @@
 pycache/
+temp/
 *.py[cod]
 .DS_Store
 Thumbs.db
 radio.db
 config_r.json
-radio_message_id.json

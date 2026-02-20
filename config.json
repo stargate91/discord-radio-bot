@@ -1,12 +1,17 @@
 {
-  "token": "YOUR_DISCORD_BOT_TOKEN",
-  "guild_id": 123456789012345678,
-  "voice_channel_id": 123456789012345678,
-  "radio_text_channel_id": 123456789012345678,
-  "default_genre": "Drum & Bass & Jungle",
-  "ffmpeg_path": "ffmpeg",
-  "genres": {
-    "Drum & Bass & Jungle": ["E:/music/dnb"],
-    "IDM & Ambient": ["E:/music/idm"]
-  }
+    "token": "TOKEN",
+    "guild_id": "GUILD_ID",
+    "voice_channel_id": "VOICE_CHANNEL_ID",
+    "radio_text_channel_id": "RADIO_TEXT_CHANNEL_ID",
+    "default_genre": "Genre 1",
+    "supported_extensions": ["mp3", "flac", "wav"],
+    "genres": {
+        "Genre 1": [
+            "C:/music/genre_1_a",
+            "C:/music/genre_1_b"
+        ],
+        "Genre 2": [
+            "C:/music/genre_2"
+        ]
+    }
 }
