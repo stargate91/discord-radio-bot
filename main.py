@@ -106,11 +106,11 @@ async def radio_player():
 
             radio.skip_event.clear()
 
-            source = discord.FFmpegPCMAudio(
-                source=song["path"],
+            source = discord.FFmpegOpusAudio(
+                song["path"],
                 executable=config.ffmpeg_path,
-                before_options="-nostdin",
-                options="-vn -acodec pcm_s16le -ar 48000 -ac 2"
+                before_options="-nostdin -re",
+                options="-vn"
             )
 
             done = asyncio.Event()
@@ -120,7 +120,13 @@ async def radio_player():
                     print("FFMPEG error:", error)
                 bot.loop.call_soon_threadsafe(done.set)
 
+            while voice.is_playing():
+                await asyncio.sleep(0.1)
+
             voice.play(source, after=after_playing)
+
+            while not voice.is_playing():
+                await asyncio.sleep(0.05)
 
             await send_now_playing(song)
 
