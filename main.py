@@ -25,7 +25,13 @@ class RadioState:
         self.voice: discord.VoiceClient | None = None
         self.genre: str = config.default_genre
         self.task: asyncio.Task | None = None
+
         self.skip_event: asyncio.Event = asyncio.Event()
+        self.stop_event: asyncio.Event = asyncio.Event()
+
+        self.current_song: dict | None = None
+        self.paused: bool = False
+        self.restart: bool = False
 
 radio = RadioState()
 
@@ -88,23 +94,34 @@ async def radio_player():
 
     while not bot.is_closed():
         try:
-
             voice = await ensure_voice()
 
             if not voice:
                 await asyncio.sleep(5)
                 continue
 
-            song = get_random_song_by_genre(radio.genre)
+            if radio.stop_event.is_set():
+                await asyncio.sleep(0.5)
+                continue
+
+            if not radio.current_song:
+                song = get_random_song_by_genre(radio.genre)
+                if not song:
+                    await asyncio.sleep(5)
+                    continue
+                radio.current_song = song
+            else:
+                song = radio.current_song
 
             if not song:
                 print("❌ Nincs szám ebben:", radio.genre)
                 await asyncio.sleep(5)
                 continue
 
-            print("▶ Playing:", song)
-
+            radio.paused = False
             radio.skip_event.clear()
+
+            print("▶ Playing:", song)
 
             source = discord.FFmpegOpusAudio(
                 song["path"],
@@ -120,6 +137,7 @@ async def radio_player():
                     print("FFMPEG error:", error)
                 bot.loop.call_soon_threadsafe(done.set)
 
+            # biztos ne menjen párhuzamosan
             while voice.is_playing():
                 await asyncio.sleep(0.1)
 
@@ -132,19 +150,33 @@ async def radio_player():
 
             wait_done = asyncio.create_task(done.wait())
             wait_skip = asyncio.create_task(radio.skip_event.wait())
+            wait_stop = asyncio.create_task(radio.stop_event.wait())
 
             done_first, pending = await asyncio.wait(
-                [wait_done, wait_skip],
+                [wait_done, wait_skip, wait_stop],
                 return_when=asyncio.FIRST_COMPLETED
             )
 
             for task in pending:
                 task.cancel()
 
+            if wait_stop in done_first:
+                voice.stop()
+                source.cleanup()
+                while radio.stop_event.is_set():
+                    await asyncio.sleep(0.5)
+                continue
+
             if wait_skip in done_first:
                 voice.stop()
-                while voice.is_playing():
-                    await asyncio.sleep(0.05)
+                radio.skip_event.clear()
+                radio.current_song = None
+
+            if wait_done in done_first:
+                if radio.restart:
+                    radio.restart = False
+                else:
+                    radio.current_song = None
 
             source.cleanup()
 
@@ -178,6 +210,54 @@ async def genre(ctx, *, new_genre: str):
     radio.skip_event.set()
 
     await ctx.send(f"🎧 Genre váltva: {new_genre}")
+
+@bot.command()
+async def pause(ctx):
+    if not radio.voice or not radio.voice.is_playing():
+        await ctx.send("⏸ Nincs mit pause-olni")
+        return
+
+    radio.voice.pause()
+    radio.paused = True
+    await ctx.send("⏸ Pause")
+
+@bot.command()
+async def play(ctx):
+
+    voice = radio.voice
+    if not voice:
+        await ctx.send("❌ Nem vagyok voice channelben")
+        return
+
+    if radio.stop_event.is_set():
+        radio.stop_event.clear()
+        await ctx.send("▶ Lejátszás indítva")
+        return
+
+    if radio.paused:
+        voice.resume()
+        radio.paused = False
+        await ctx.send("▶ Folytatás")
+        return
+
+    if voice.is_playing() and radio.current_song:
+        radio.restart = True
+        voice.stop()
+        await ctx.send("▶ Újrakezdve (0:00)")
+
+@bot.command()
+async def stop(ctx):
+
+    if not radio.voice:
+        return
+
+    radio.stop_event.set()
+    radio.paused = False
+
+    if radio.voice.is_playing():
+        radio.voice.stop()
+
+    await ctx.send("⏹ Stop (lejátszás megállítva)")
 
 @bot.event
 async def on_ready():
