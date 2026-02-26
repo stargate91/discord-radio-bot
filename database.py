@@ -2,7 +2,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-DB_DIR = Path("/data")
+DB_DIR = Path("data")
 DB_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_FILE = DB_DIR / "radio.db"

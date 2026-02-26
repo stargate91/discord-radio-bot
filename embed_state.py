@@ -5,7 +5,7 @@ from pathlib import Path
 
 class EmbedStateManager:
     def __init__(self, file_path: str = "radio_embed_state.json"):
-        data_dir = Path("/data")
+        data_dir = Path(__file__).parent / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
 
         self.file_path = data_dir / file_path

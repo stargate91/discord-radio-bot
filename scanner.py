@@ -60,7 +60,7 @@ def extract_tags(file_path: Path):
     title = get_tag(tags, "title", "TITLE", "TIT2")
     album = get_tag(tags, "album", "ALBUM", "TALB")
     date = get_tag(tags, "date", "DATE", "year", "YEAR", "TDRC")
-    label = get_tag(tags, "publisher", "PUBLISHER", "TPUB")
+    label = get_tag(tags, "organization", "ORGANIZATION", "TPUB")
     catnum = get_tag(tags, "catalognumber", "CATALOGNUMBER", "TXXX:CATALOGNUMBER")
     mediatype_flac = get_tag(tags, "mediatype", "MEDIATYPE")
     mediatype_mp3 = get_tag(tags, "TMED")

@@ -28,10 +28,12 @@ def build_embed(song: dict) -> discord.Embed:
             return t[:length - 3] + "..."
         return t.ljust(length)
 
-    artist = fix(song.get("artist") or "Unknown Artist", 45)
-    title = fix(song.get("title") or Path(song["path"]).stem, 45)
-    album = fix(song.get("album") or "Unknown Album", 45)
+    artist = fix(song.get("artist") or "Unknown Artist", 35)
+    title = fix(song.get("title") or Path(song["path"]).stem, 35)
+    album = fix(song.get("album") or "Unknown Album", 35)
     date = fix(song.get("date") or "Unknown Year", 8)
+    label = fix(song.get("label") or "Unknown Label", 35)
+    catnum = fix(song.get("catnum") or "Unknow #CAT", 35)
     genre = fix(song.get("genre") or "Unknown Genre", 15)
     duration = fix(format_duration(song.get("duration", 0)), 8)
     source = fix(
@@ -50,6 +52,8 @@ Title: {title}
 Album: {album}
 Year: {date}
 Genre: {genre}
+Label: {label}
+CATNUM: {catnum}
 Duration: {duration}
 Media: {source}
 Rating: {likes} 👍 | {dislikes} 👎
