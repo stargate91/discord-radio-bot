@@ -21,51 +21,43 @@ def format_duration(seconds: int):
     m, s = divmod(seconds, 60)
     return f"{m}:{s:02d}"
 
+def fixed(text: str, length: int = 42):
+    text = str(text)
+
+    if len(text) > length:
+        return text[:length - 3] + "..."
+    
+    return text.ljust(length)
+
 def build_embed(song: dict) -> discord.Embed:
-    def fix(text, length):
-        t = text or ""
-        if len(t) > length:
-            return t[:length - 3] + "..."
-        return t.ljust(length)
-
-    artist = fix(song.get("artist") or "Unknown Artist", 35)
-    title = fix(song.get("title") or Path(song["path"]).stem, 35)
-    album = fix(song.get("album") or "Unknown Album", 35)
-    date = fix(song.get("date") or "Unknown Year", 8)
-    label = fix(song.get("label") or "Unknown Label", 35)
-    catnum = fix(song.get("catnum") or "Unknow #CAT", 35)
-    genre = fix(song.get("genre") or "Unknown Genre", 15)
-    duration = fix(format_duration(song.get("duration", 0)), 8)
-    source = fix(
-        song.get("mediatype_flac") or
-        song.get("mediatype_mp3") or
-        "Unknown",
-        8
-    )
-
-    likes = str(song.get("likes", 0))
-    dislikes = str(song.get("dislikes", 0))
-
-    description = f"""```
-Artist: {artist}
-Title: {title}
-Album: {album}
-Year: {date}
-Genre: {genre}
-Label: {label}
-CATNUM: {catnum}
-Duration: {duration}
-Media: {source}
-Rating: {likes} 👍 | {dislikes} 👎
-```"""
 
     embed = discord.Embed(
-        title="🎧 NOW PLAYING",
-        description=description,
-        color=discord.Color.dark_blue()
+    title=f"🎧 NOW PLAYING - {song.get('genre')}",
+    color=discord.Color.blurple()
+    )
+
+    embed.description = (
+            "```md\n"
+            f"{fixed(f'Artist = {song.get('artist')}')}\n"
+            f"{fixed(f'Title  = {song.get('title')}')}\n"
+            f"{fixed(f'Album  = {song.get('album')}')}\n"
+            "```"
+        )
+
+    embed.add_field(
+        name="Rating",
+        value=f"Likes: {song.get('likes', 0)} | Dislikes: {song.get('dislikes', 0)}",
+        inline=True
+    )
+
+    embed.add_field(
+        name="Duration",
+        value=f"{format_duration(song.get('duration', 0))}",
+        inline=True
     )
 
     embed.set_footer(text="CityRadio • Stay online. Stay awake.")
+
     return embed
 
 async def update_now_playing(song: dict):
@@ -165,7 +157,7 @@ class SkipButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
             label="⏭ Skip",
-            style=discord.ButtonStyle.primary,
+            style=discord.ButtonStyle.secondary,
             custom_id="skip_button"
         )
         self.radio = radio
@@ -187,7 +179,7 @@ class SkipButton(discord.ui.Button):
 class SeekButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label="⏩ Seek",
+            label="⏩ Go To",
             style=discord.ButtonStyle.secondary,
             custom_id="seek_button"
         )
@@ -256,8 +248,8 @@ class SeekModal(Modal):
 class VolumeButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label="🔊 Volume",
-            style=discord.ButtonStyle.success,
+            label="🔊 Vol",
+            style=discord.ButtonStyle.secondary,
             custom_id="volume_button"
         )
         self.radio = radio
@@ -314,7 +306,7 @@ class LikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
             label="❤️ Like",
-            style=discord.ButtonStyle.success,
+            style=discord.ButtonStyle.secondary,
             custom_id="like_button"
         )
         self.radio = radio
@@ -364,7 +356,7 @@ class DislikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
             label="👎 Dislike",
-            style=discord.ButtonStyle.danger,
+            style=discord.ButtonStyle.secondary,
             custom_id="dislike_button"
         )
         self.radio = radio
@@ -408,4 +400,4 @@ class DislikeButton(discord.ui.Button):
             await interaction.response.send_message(
                 "❌ Failed to record dislike",
                 ephemeral=True
-            )
+                )
