@@ -22,6 +22,26 @@ def format_duration(seconds: int):
     m, s = divmod(seconds, 60)
     return f"{m}:{s:02d}"
 
+class DetailsButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label="📂 Details",
+            style=discord.ButtonStyle.secondary,
+            custom_id="details_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        if not self.radio.current_song:
+            await interaction.response.send_message(
+                "❌ No song is currently playing",
+                ephemeral=True
+            )
+            return
+
+        embed = build_detailed_embed(self.radio.current_song)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 def fixed(text: str, length: int = 42):
     text = str(text)
 
@@ -150,18 +170,7 @@ def build_detailed_embed(song: dict) -> discord.Embed:
     label = song.get('label', 'Unknown')
     catnum = song.get('catnum', 'Unknown')
 
-    # Media type detection
-    media_type = "Unknown"
-    if song.get('mediatype_flac'):
-        media_type = "FLAC"
-    elif song.get('mediatype_mp3'):
-        media_type = "MP3"
-    elif song.get('path'):
-        ext = Path(song['path']).suffix.lower()
-        if ext == '.flac':
-            media_type = "FLAC"
-        elif ext == '.mp3':
-            media_type = "MP3"
+    media_type = song.get('mediatype_flac') or song.get('mediatype_mp3') or 'Unknown'
 
     embed.description = (
         "```md\n"
@@ -170,8 +179,8 @@ def build_detailed_embed(song: dict) -> discord.Embed:
         f"{fixed(f'Album  = {song.get('album', 'Unknown')}')}\n"
         f"{fixed(f'Year   = {date}')}\n"
         f"{fixed(f'Label  = {label}')}\n"
-        f"{fixed(f'Catalog= {catnum}')}\n"
-        f"{fixed(f'Format = {media_type}')}\n"
+        f"{fixed(f'CATNUM = {catnum}')}\n"
+        f"{fixed(f'Source = {media_type}')}\n"
         f"{fixed(f'Length = {format_duration(song.get('duration', 0))}')}\n"
         "```"
     )
