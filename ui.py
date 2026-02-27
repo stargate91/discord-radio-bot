@@ -428,17 +428,12 @@ class LikeButton(discord.ui.Button):
 
         song_path = self.radio.current_song.get("path")
 
+        song_path = self.radio.current_song.get("path")
+
         try:
-            with self.db._connect() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE songs SET likes = likes + 1 WHERE path = ?",
-                    (song_path,)
-                )
-                conn.commit()
-
+            status = self.db.toggle_rating(interaction.user.id, song_path, 'like')
+            
             updated_song = self.db.get_song_by_path(song_path)
-
             if updated_song:
                 self.radio.last_user = interaction.user
                 self.radio.current_song = updated_song
@@ -447,10 +442,14 @@ class LikeButton(discord.ui.Button):
             artist = updated_song.get("artist") or "Unknown Artist"
             title = updated_song.get("title") or "Unknown Title"
 
-            await interaction.response.send_message(
-                f"❤️ Liked: **{artist} - {title}**",
-                ephemeral=True
-            )
+            if status == "added":
+                msg = f"❤️ Liked: **{artist} - {title}**"
+            elif status == "removed":
+                msg = f"❤️ Like withdrawn: **{artist} - {title}**"
+            else:  # changed
+                msg = f"❤️ Liked (replaced dislike): **{artist} - {title}**"
+
+            await interaction.response.send_message(msg, ephemeral=True)
 
         except Exception as e:
             print(f"Like error: {e}")
@@ -480,16 +479,9 @@ class DislikeButton(discord.ui.Button):
         song_path = self.radio.current_song.get("path")
 
         try:
-            with self.db._connect() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE songs SET dislikes = dislikes + 1 WHERE path = ?",
-                    (song_path,)
-                )
-                conn.commit()
-
+            status = self.db.toggle_rating(interaction.user.id, song_path, 'dislike')
+            
             updated_song = self.db.get_song_by_path(song_path)
-
             if updated_song:
                 self.radio.last_user = interaction.user
                 self.radio.current_song = updated_song
@@ -498,10 +490,14 @@ class DislikeButton(discord.ui.Button):
             artist = updated_song.get("artist") or "Unknown Artist"
             title = updated_song.get("title") or "Unknown Title"
 
-            await interaction.response.send_message(
-                f"👎 Disliked: **{artist} - {title}**",
-                ephemeral=True
-            )
+            if status == "added":
+                msg = f"👎 Disliked: **{artist} - {title}**"
+            elif status == "removed":
+                msg = f"👎 Dislike withdrawn: **{artist} - {title}**"
+            else:  # changed
+                msg = f"👎 Disliked (replaced like): **{artist} - {title}**"
+
+            await interaction.response.send_message(msg, ephemeral=True)
 
         except Exception as e:
             print(f"Dislike error: {e}")

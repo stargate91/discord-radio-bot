@@ -40,6 +40,14 @@ class DatabaseManager:
                 dislikes INTEGER DEFAULT 0
             )
             """)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_ratings (
+                user_id INTEGER,
+                song_path TEXT,
+                rating_type TEXT CHECK(rating_type IN ('like', 'dislike')),
+                PRIMARY KEY (user_id, song_path)
+            )
+            """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_genre ON songs(genre)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_artist ON songs(artist)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_album ON songs(album)")
@@ -155,3 +163,45 @@ class DatabaseManager:
             cursor.execute("SELECT * FROM songs WHERE path = ?", (path,))
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    def toggle_rating(self, user_id: int, song_path: str, rating_type: str):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                "SELECT rating_type FROM user_ratings WHERE user_id = ? AND song_path = ?",
+                (user_id, song_path)
+            )
+            existing = cursor.fetchone()
+            
+            status = ""
+            if existing:
+                existing_type = existing[0]
+                if existing_type == rating_type:
+                    cursor.execute(
+                        "DELETE FROM user_ratings WHERE user_id = ? AND song_path = ?",
+                        (user_id, song_path)
+                    )
+                    column = "likes" if rating_type == "like" else "dislikes"
+                    cursor.execute(f"UPDATE songs SET {column} = {column} - 1 WHERE path = ?", (song_path,))
+                    status = "removed"
+                else:
+                    cursor.execute(
+                        "UPDATE user_ratings SET rating_type = ? WHERE user_id = ? AND song_path = ?",
+                        (rating_type, user_id, song_path)
+                    )
+                    old_col = "likes" if existing_type == "like" else "dislikes"
+                    new_col = "likes" if rating_type == "like" else "dislikes"
+                    cursor.execute(f"UPDATE songs SET {old_col} = {old_col} - 1, {new_col} = {new_col} + 1 WHERE path = ?", (song_path,))
+                    status = "changed"
+            else:
+                cursor.execute(
+                    "INSERT INTO user_ratings (user_id, song_path, rating_type) VALUES (?, ?, ?)",
+                    (user_id, song_path, rating_type)
+                )
+                column = "likes" if rating_type == "like" else "dislikes"
+                cursor.execute(f"UPDATE songs SET {column} = {column} + 1 WHERE path = ?", (song_path,))
+                status = "added"
+                
+            conn.commit()
+            return status
