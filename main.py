@@ -6,6 +6,9 @@ from ui import init_ui
 import asyncio
 import discord
 
+from radio_actions import RadioState as RadioStatusEnum, RadioAction
+import asyncio
+
 config = load_config()
 db = DatabaseManager()
 
@@ -32,6 +35,13 @@ class RadioState:
         self.skip_notification: bool = False
         self.volume: float = 0.5
         self.now_playing_message: discord.Message | None = None
+        
+        self.status = RadioStatusEnum.PLAYING
+        self.action_queue = asyncio.Queue()
+
+    def dispatch(self, action: RadioAction, data=None):
+        print(f"[ACTION] Dispatching: {action.name} with data: {data}")
+        self.action_queue.put_nowait((action, data))
 
 radio = RadioState()
 init_ui(bot, config, radio, db)
@@ -67,9 +77,42 @@ async def radio_player():
     while not bot.is_closed():
         try:
             voice = await ensure_voice()
-
             if not voice:
                 await asyncio.sleep(5)
+                continue
+
+            if radio.status == RadioStatusEnum.IDLE:
+                print("[RADIO] Idle, waiting for action...")
+                action, data = await radio.action_queue.get()
+                if action == RadioAction.SET_GENRE:
+                    radio.genre = data
+                    radio.is_seeking = False
+                elif action == RadioAction.SET_VOLUME:
+                    radio.volume = data
+                    continue
+                elif action == RadioAction.REPLAY:
+                    radio.is_seeking = True
+                    radio.seek_position = 0
+                elif action == RadioAction.SKIP:
+                    radio.is_seeking = False
+                else:
+                    continue
+                
+                radio.status = RadioStatusEnum.PLAYING
+
+            while radio.action_queue.qsize() > 0:
+                action, data = radio.action_queue.get_nowait()
+                if action == RadioAction.SET_GENRE:
+                    radio.genre = data
+                    radio.is_seeking = False
+                elif action == RadioAction.SET_VOLUME:
+                    radio.volume = data
+                elif action == RadioAction.SKIP:
+                    radio.is_seeking = False
+                elif action == RadioAction.STOP:
+                    radio.status = RadioStatusEnum.IDLE
+
+            if radio.status == RadioStatusEnum.IDLE:
                 continue
 
             if radio.is_seeking and radio.current_song:
@@ -77,19 +120,21 @@ async def radio_player():
             else:
                 song = get_random_song_by_genre(radio.genre)
                 radio.current_song = song
-                radio.is_seeking = False
+            
+            radio.is_seeking = False
 
             if not song:
                 print("❌ There is no track in this:", radio.genre)
+                radio.status = RadioStatusEnum.IDLE
                 await asyncio.sleep(5)
                 continue
 
+            radio.status = RadioStatusEnum.PLAYING
             print("▶ Playing:", song)
 
             radio.skip_event.clear()
 
             before_opts = "-nostdin -re"
-
             if radio.seek_position is not None:
                 before_opts += f" -ss {radio.seek_position}"
 
@@ -103,7 +148,6 @@ async def radio_player():
             )
 
             radio.seek_position = None
-
             done = asyncio.Event()
 
             def after_playing(error):
@@ -111,46 +155,93 @@ async def radio_player():
                     print("FFMPEG error:", error)
                 bot.loop.call_soon_threadsafe(done.set)
 
-            while voice.is_playing():
+            while voice.is_playing() or voice.is_paused():
                 await asyncio.sleep(0.1)
 
             voice.play(raw_source, after=after_playing)
 
-            while not voice.is_playing():
+            while not voice.is_playing() and not voice.is_paused():
                 await asyncio.sleep(0.05)
 
             await update_now_playing(song)
-
             radio.skip_notification = False
 
             song_duration = song.get("duration", 0)
             ten_percent_duration = int(song_duration * 0.1)
-
             start_time = asyncio.get_event_loop().time()
 
-            wait_done = asyncio.create_task(done.wait())
-            wait_skip = asyncio.create_task(radio.skip_event.wait())
+            while not done.is_set():
+                try:
+                    action_task = asyncio.create_task(radio.action_queue.get())
+                    done_task = asyncio.create_task(done.wait())
+                    
+                    finished, pending = await asyncio.wait(
+                        [action_task, done_task],
+                        return_when=asyncio.FIRST_COMPLETED,
+                        timeout=5.0
+                    )
 
-            done_first, pending = await asyncio.wait(
-                [wait_done, wait_skip],
-                return_when=asyncio.FIRST_COMPLETED
-            )
+                    for task in pending:
+                        task.cancel()
 
-            for task in pending:
-                task.cancel()
+                    if action_task in finished:
+                        action, data = action_task.result()
+                        print(f"[PROCESS] Action: {action.name}")
+                        
+                        if action == RadioAction.SKIP:
+                            radio.is_seeking = False
+                            voice.stop()
+                            break
+                        elif action == RadioAction.SEEK:
+                            radio.seek_position = data
+                            radio.is_seeking = True
+                            radio.skip_notification = True
+                            voice.stop()
+                            break
+                        elif action == RadioAction.SET_VOLUME:
+                            radio.volume = data
+                            radio.is_seeking = True
+                            radio.skip_notification = True
+                            voice.stop()
+                            break
+                        elif action == RadioAction.REPLAY:
+                            if radio.status == RadioStatusEnum.PAUSED:
+                                voice.resume()
+                                radio.status = RadioStatusEnum.PLAYING
+                                await update_now_playing(song)
+                            else:
+                                radio.seek_position = 0
+                                radio.is_seeking = True
+                                radio.skip_notification = True
+                                voice.stop()
+                                break
+                        elif action == RadioAction.PAUSE:
+                            if voice.is_playing():
+                                voice.pause()
+                                radio.status = RadioStatusEnum.PAUSED
+                                await update_now_playing(song)
+                        elif action == RadioAction.STOP:
+                            radio.is_seeking = True
+                            radio.seek_position = 0
+                            radio.status = RadioStatusEnum.IDLE
+                            voice.stop()
+                            await update_now_playing(song)
+                            break
+                        elif action == RadioAction.SET_GENRE:
+                            radio.genre = data
+                            radio.is_seeking = False
+                            voice.stop()
+                            break
+                    
+                    if done_task in finished:
+                        break
+
+                except asyncio.TimeoutError:
+                    continue
 
             elapsed_time = asyncio.get_event_loop().time() - start_time
 
-            if wait_skip in done_first:
-                voice.stop()
-
-                while voice.is_playing():
-                    await asyncio.sleep(0.05)
-
-                if elapsed_time >= ten_percent_duration:
-                    db.update_last_played(song["path"])
-                    print(f"✓ Last played updated for: {song['path']}")
-            else:
+            if elapsed_time >= ten_percent_duration or not radio.is_seeking:
                 db.update_last_played(song["path"])
                 print(f"✓ Last played updated for: {song['path']}")
 
@@ -158,6 +249,8 @@ async def radio_player():
 
         except Exception as e:
             print("Radio loop crash:", e)
+            import traceback
+            traceback.print_exc()
             await asyncio.sleep(5)
 
 

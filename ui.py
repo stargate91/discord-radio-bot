@@ -1,4 +1,5 @@
 import discord
+from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from discord.ui import Modal, TextInput
 from pathlib import Path
 from embed_state import EmbedStateManager
@@ -30,19 +31,29 @@ def fixed(text: str, length: int = 42):
     return text.ljust(length)
 
 def build_embed(song: dict) -> discord.Embed:
+    status_title = "NOW PLAYING"
+    status_color = discord.Color.blurple()
+
+    if radio:
+        if radio.status == RadioStatusEnum.PAUSED:
+            status_title = "PAUSED"
+            status_color = discord.Color.gold()
+        elif radio.status == RadioStatusEnum.IDLE:
+            status_title = "IDLE"
+            status_color = discord.Color.red()
 
     embed = discord.Embed(
-    title=f"🎧 NOW PLAYING - {song.get('genre')}",
-    color=discord.Color.blurple()
+        title=f"🎧 {status_title} - {song.get('genre', 'Unknown').upper()}",
+        color=status_color
     )
 
     embed.description = (
-            "```md\n"
-            f"{fixed(f'Artist = {song.get('artist')}')}\n"
-            f"{fixed(f'Title  = {song.get('title')}')}\n"
-            f"{fixed(f'Album  = {song.get('album')}')}\n"
-            "```"
-        )
+        "```md\n"
+        f"{fixed(f'Artist = {song.get('artist', 'Unknown')}')}\n"
+        f"{fixed(f'Title  = {song.get('title', 'Unknown')}')}\n"
+        f"{fixed(f'Album  = {song.get('album', 'Unknown')}')}\n"
+        "```"
+    )
 
     embed.add_field(
         name="Rating",
@@ -113,6 +124,9 @@ class RadioControlView(discord.ui.View):
     def __init__(self, radio, db):
         super().__init__(timeout=None)
         self.add_item(GenreSelect(radio, db))
+        self.add_item(PlayButton(radio))
+        self.add_item(PauseButton(radio))
+        self.add_item(StopButton(radio))
         self.add_item(SkipButton(radio))
         self.add_item(SeekButton(radio))
         self.add_item(VolumeButton(radio))
@@ -145,11 +159,58 @@ class GenreSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
-        self.radio.genre = selected
-        self.radio.skip_event.set()
+        self.radio.dispatch(RadioAction.SET_GENRE, selected)
 
         await interaction.response.send_message(
-            f"🎧 Genre switched to: **{selected.upper()}**",
+            f"🎧 Genre switching to: **{selected.upper()}**",
+            ephemeral=True
+        )
+
+class PlayButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label="▶ Play",
+            style=discord.ButtonStyle.secondary,
+            custom_id="play_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.dispatch(RadioAction.REPLAY)
+        await interaction.response.send_message(
+            "▶ Resuming/Replaying playback...",
+            ephemeral=True
+        )
+
+class PauseButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label="⏸ Pause",
+            style=discord.ButtonStyle.secondary,
+            custom_id="pause_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.dispatch(RadioAction.PAUSE)
+        await interaction.response.send_message(
+            "⏸ Pausing playback...",
+            ephemeral=True
+        )
+
+class StopButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label="⏹ Stop",
+            style=discord.ButtonStyle.secondary,
+            custom_id="stop_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.dispatch(RadioAction.STOP)
+        await interaction.response.send_message(
+            "⏹ Stopping playback...",
             ephemeral=True
         )
 
@@ -163,11 +224,11 @@ class SkipButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        if self.radio.voice and self.radio.voice.is_playing():
-            self.radio.skip_event.set()
+        if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
+            self.radio.dispatch(RadioAction.SKIP)
 
             await interaction.response.send_message(
-                "⏭ Skipped the current track!",
+                "⏭ Skipping the current track...",
                 ephemeral=True
             )
         else:
@@ -233,15 +294,10 @@ class SeekModal(Modal):
             )
             return
 
-        self.radio.seek_position = total_seconds
-        self.radio.is_seeking = True
-        self.radio.skip_notification = True
-
-        if self.radio.voice and self.radio.voice.is_playing():
-            self.radio.voice.stop()
+        self.radio.dispatch(RadioAction.SEEK, total_seconds)
 
         await interaction.response.send_message(
-            f"⏩ Jumping to {ts}",
+            f"⏩ Jumping to {ts}...",
             ephemeral=True
         )
 
@@ -290,12 +346,7 @@ class VolumeModal(Modal):
             )
             return
 
-        self.radio.volume = value / 100
-
-        if self.radio.voice and self.radio.voice.is_playing():
-            self.radio.is_seeking = True
-            self.radio.skip_notification = True
-            self.radio.skip_event.set()
+        self.radio.dispatch(RadioAction.SET_VOLUME, value / 100)
 
         await interaction.response.send_message(
             f"🔊 Volume set to: {value}%",
