@@ -138,6 +138,46 @@ class RadioControlView(discord.ui.View):
         self.add_item(VolumeButton(radio))
         self.add_item(LikeButton(radio, db))
         self.add_item(DislikeButton(radio, db))
+        self.add_item(DetailsButton(radio))
+
+def build_detailed_embed(song: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title="📂 SONG DETAILS",
+        color=discord.Color.blue()
+    )
+
+    date = song.get('date', 'Unknown')
+    label = song.get('label', 'Unknown')
+    catnum = song.get('catnum', 'Unknown')
+
+    # Media type detection
+    media_type = "Unknown"
+    if song.get('mediatype_flac'):
+        media_type = "FLAC"
+    elif song.get('mediatype_mp3'):
+        media_type = "MP3"
+    elif song.get('path'):
+        ext = Path(song['path']).suffix.lower()
+        if ext == '.flac':
+            media_type = "FLAC"
+        elif ext == '.mp3':
+            media_type = "MP3"
+
+    embed.description = (
+        "```md\n"
+        f"{fixed(f'Artist = {song.get('artist', 'Unknown')}')}\n"
+        f"{fixed(f'Title  = {song.get('title', 'Unknown')}')}\n"
+        f"{fixed(f'Album  = {song.get('album', 'Unknown')}')}\n"
+        f"{fixed(f'Year   = {date}')}\n"
+        f"{fixed(f'Label  = {label}')}\n"
+        f"{fixed(f'Catalog= {catnum}')}\n"
+        f"{fixed(f'Format = {media_type}')}\n"
+        f"{fixed(f'Length = {format_duration(song.get('duration', 0))}')}\n"
+        "```"
+    )
+
+    embed.set_footer(text="CityRadio Database Explorer")
+    return embed
 
 class GenreSelect(discord.ui.Select):
     def __init__(self, radio, db):
