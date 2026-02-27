@@ -35,10 +35,20 @@ class RadioState:
         self.skip_notification: bool = False
         self.volume: float = 0.5
         self.now_playing_message: discord.Message | None = None
+        self.queue_message: discord.Message | None = None
+        self.queue: list[dict] = []
+        self.show_queue: bool = False
         
         self.status = RadioStatusEnum.PLAYING
         self.action_queue = asyncio.Queue()
         self.last_user: discord.Member | discord.User | None = None
+
+    def refresh_queue(self):
+        self.queue = []
+        for _ in range(11):  # 1 for current, 10 for up next
+            song = get_random_song_by_genre(self.genre)
+            if song:
+                self.queue.append(song)
 
     def dispatch(self, action: RadioAction, data=None, user: discord.Member | discord.User | None = None):
         print(f"[ACTION] Dispatching: {action.name} with data: {data} by user: {user}")
@@ -90,6 +100,7 @@ async def radio_player():
                 if action == RadioAction.SET_GENRE:
                     radio.genre = data
                     radio.is_seeking = False
+                    radio.refresh_queue()
                 elif action == RadioAction.SET_VOLUME:
                     radio.volume = data
                     continue
@@ -108,12 +119,14 @@ async def radio_player():
                 if action == RadioAction.SET_GENRE:
                     radio.genre = data
                     radio.is_seeking = False
+                    radio.refresh_queue()
                 elif action == RadioAction.SET_VOLUME:
                     radio.volume = data
                 elif action == RadioAction.SKIP:
                     radio.is_seeking = False
                 elif action == RadioAction.STOP:
                     radio.status = RadioStatusEnum.IDLE
+                    radio.refresh_queue()
 
             if radio.status == RadioStatusEnum.IDLE:
                 continue
@@ -121,7 +134,18 @@ async def radio_player():
             if radio.is_seeking and radio.current_song:
                 song = radio.current_song
             else:
-                song = get_random_song_by_genre(radio.genre)
+                if not radio.queue:
+                    radio.refresh_queue()
+                
+                if radio.queue:
+                    song = radio.queue.pop(0)
+                    # Refill queue
+                    new_song = get_random_song_by_genre(radio.genre)
+                    if new_song:
+                        radio.queue.append(new_song)
+                else:
+                    song = None
+
                 radio.current_song = song
             
             radio.is_seeking = False
@@ -233,6 +257,7 @@ async def radio_player():
                         elif action == RadioAction.SET_GENRE:
                             radio.genre = data
                             radio.is_seeking = False
+                            radio.refresh_queue()
                             voice.stop()
                             break
                     

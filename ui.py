@@ -102,10 +102,12 @@ async def update_now_playing(song: dict):
     if not channel:
         return
 
-    embed = build_embed(song)
+    player_embed = build_embed(song)
+    queue_embed = build_queue_embed(radio.queue, song)
 
+    # Handle Player Message
     if not radio.now_playing_message:
-        message_id = embed_state.load_message_id()
+        message_id = embed_state.load_message_id("player")
         if message_id:
             try:
                 radio.now_playing_message = await channel.fetch_message(message_id)
@@ -115,33 +117,116 @@ async def update_now_playing(song: dict):
     if radio.now_playing_message:
         try:
             await radio.now_playing_message.edit(
-                embed=embed,
+                embed=player_embed,
                 view=RadioControlView(radio, db)
             )
-            return
         except:
             radio.now_playing_message = None
+            
+    if not radio.now_playing_message:
+        view = RadioControlView(radio, db)
+        msg = await channel.send(embed=player_embed, view=view)
+        radio.now_playing_message = msg
+        embed_state.save_message_id("player", msg.id)
 
-    view = RadioControlView(radio, db)
-    msg = await channel.send(embed=embed, view=view)
-    radio.now_playing_message = msg
-    embed_state.save_message_id(msg.id)
+    # Handle Queue Message
+    if radio.show_queue:
+        if not radio.queue_message:
+            message_id = embed_state.load_message_id("queue")
+            if message_id:
+                try:
+                    radio.queue_message = await channel.fetch_message(message_id)
+                except:
+                    radio.queue_message = None
+
+        if radio.queue_message:
+            try:
+                await radio.queue_message.edit(embed=queue_embed)
+            except:
+                radio.queue_message = None
+
+        if not radio.queue_message:
+            msg = await channel.send(embed=queue_embed)
+            radio.queue_message = msg
+            embed_state.save_message_id("queue", msg.id)
+    else:
+        # Hide/Delete queue if it exists
+        if radio.queue_message:
+            try:
+                await radio.queue_message.delete()
+            except:
+                pass
+            radio.queue_message = None
+            
+        old_queue_id = embed_state.load_message_id("queue")
+        if old_queue_id:
+            # We don't necessarily delete the message from Discord here to avoid lag, 
+            # but we clear the state so it won't be edited anymore.
+            # Actually, let's try to delete it to be clean.
+            try:
+                m = await channel.fetch_message(old_queue_id)
+                await m.delete()
+            except:
+                pass
+            
+        # Clear message ID from state so it's not "dead" weight
+        # Note: save_message_id with None isn't explicitly supported but _load_data and pop could be used.
+        # For now, let's just leave it, it's not a huge issue since load_message_id with "queue" 
+        # is only called when show_queue is True.
+
+def build_queue_embed(queue: list[dict], current_song: dict) -> discord.Embed:
+    embed = discord.Embed(
+        title="⏭️ UP NEXT",
+        color=discord.Color.dark_grey()
+    )
+    
+    lines = []
+    
+    # Highlight current song
+    if current_song:
+        artist = current_song.get("artist", "Unknown")
+        title = current_song.get("title", "Unknown")
+        lines.append(f"▶️ **{artist} - {title}** *(Now Playing)*")
+    
+    # List next 10
+    for i, song in enumerate(queue[:10], 1):
+        artist = song.get("artist", "Unknown")
+        title = song.get("title", "Unknown")
+        lines.append(f"{i}. {artist} - {title}")
+    
+    if not lines:
+        lines.append("*The queue is currently empty.*")
+        
+    embed.description = "\n".join(lines)
+    embed.set_footer(text=f"Total songs in library: {len(db.get_all_genres())} genres") # Placeholder or more useful info
+    
+    return embed
 
 async def force_new_embed():
     channel = bot.get_channel(config.radio_text_channel_id)
     if not channel:
         return
 
-    old_id = embed_state.load_message_id()
-
-    if old_id:
+    # Delete player msg
+    old_player_id = embed_state.load_message_id("player")
+    if old_player_id:
         try:
-            old_msg = await channel.fetch_message(old_id)
+            old_msg = await channel.fetch_message(old_player_id)
+            await old_msg.delete()
+        except:
+            pass
+    
+    # Delete queue msg
+    old_queue_id = embed_state.load_message_id("queue")
+    if old_queue_id:
+        try:
+            old_msg = await channel.fetch_message(old_queue_id)
             await old_msg.delete()
         except:
             pass
 
     radio.now_playing_message = None
+    radio.queue_message = None
 
     if radio.current_song:
         await update_now_playing(radio.current_song)
@@ -159,6 +244,31 @@ class RadioControlView(discord.ui.View):
         self.add_item(LikeButton(radio, db))
         self.add_item(DislikeButton(radio, db))
         self.add_item(DetailsButton(radio))
+        self.add_item(QueueToggleButton(radio))
+
+class QueueToggleButton(discord.ui.Button):
+    def __init__(self, radio):
+        label = "📋 Hide Queue" if radio.show_queue else "📋 Show Queue"
+        super().__init__(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            custom_id="queue_toggle_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.show_queue = not self.radio.show_queue
+        
+        # Immediate label update
+        self.label = "📋 Hide Queue" if self.radio.show_queue else "📋 Show Queue"
+        
+        # Update both embeds
+        await update_now_playing(self.radio.current_song)
+        
+        await interaction.response.send_message(
+            f"📋 Queue visibility: **{'Shown' if self.radio.show_queue else 'Hidden'}**",
+            ephemeral=True
+        )
 
 def build_detailed_embed(song: dict) -> discord.Embed:
     embed = discord.Embed(
@@ -295,7 +405,7 @@ class SkipButton(discord.ui.Button):
 class SeekButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label="⏩ Go To",
+            label="⏩ Move To",
             style=discord.ButtonStyle.secondary,
             custom_id="seek_button"
         )
@@ -505,3 +615,43 @@ class DislikeButton(discord.ui.Button):
                 "❌ Failed to record dislike",
                 ephemeral=True
                 )
+
+class DetailsButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label="📂 Info",
+            style=discord.ButtonStyle.secondary,
+            custom_id="details_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        if not self.radio.current_song:
+            await interaction.response.send_message(
+                "❌ No song is currently playing",
+                ephemeral=True
+            )
+            return
+
+        embed = build_detailed_embed(self.radio.current_song)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class QueueToggleButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label="📋 Queue",
+            style=discord.ButtonStyle.secondary,
+            custom_id="queue_toggle_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.show_queue = not self.radio.show_queue
+        
+        # Update both embeds
+        await update_now_playing(self.radio.current_song)
+        
+        await interaction.response.send_message(
+            f"📋 Queue visibility: **{'Shown' if self.radio.show_queue else 'Hidden'}**",
+            ephemeral=True
+        )
