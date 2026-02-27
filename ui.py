@@ -31,19 +31,19 @@ def fixed(text: str, length: int = 42):
     return text.ljust(length)
 
 def build_embed(song: dict) -> discord.Embed:
-    status_title = "NOW PLAYING"
+    status_title = "🎧 NOW PLAYING"
     status_color = discord.Color.blurple()
 
     if radio:
         if radio.status == RadioStatusEnum.PAUSED:
-            status_title = "PAUSED"
+            status_title = "⏸️ PAUSED"
             status_color = discord.Color.gold()
         elif radio.status == RadioStatusEnum.IDLE:
-            status_title = "IDLE"
+            status_title = "⏹️ IDLE"
             status_color = discord.Color.red()
 
     embed = discord.Embed(
-        title=f"🎧 {status_title} - {song.get('genre', 'Unknown').upper()}",
+        title=f"{status_title} - {song.get('genre', 'Unknown').upper()}",
         color=status_color
     )
 
@@ -67,7 +67,13 @@ def build_embed(song: dict) -> discord.Embed:
         inline=True
     )
 
-    embed.set_footer(text="CityRadio • Stay online. Stay awake.")
+    if radio and radio.last_user:
+        embed.set_footer(
+            text=f"Tuned by {radio.last_user.display_name} • CityRadio",
+            icon_url=radio.last_user.display_avatar.url
+        )
+    else:
+        embed.set_footer(text="CityRadio • Stay online. Stay awake.")
 
     return embed
 
@@ -159,7 +165,7 @@ class GenreSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
-        self.radio.dispatch(RadioAction.SET_GENRE, selected)
+        self.radio.dispatch(RadioAction.SET_GENRE, selected, user=interaction.user)
 
         await interaction.response.send_message(
             f"🎧 Genre switching to: **{selected.upper()}**",
@@ -176,7 +182,7 @@ class PlayButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        self.radio.dispatch(RadioAction.REPLAY)
+        self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
         await interaction.response.send_message(
             "▶ Resuming/Replaying playback...",
             ephemeral=True
@@ -192,7 +198,7 @@ class PauseButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        self.radio.dispatch(RadioAction.PAUSE)
+        self.radio.dispatch(RadioAction.PAUSE, user=interaction.user)
         await interaction.response.send_message(
             "⏸ Pausing playback...",
             ephemeral=True
@@ -208,7 +214,7 @@ class StopButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        self.radio.dispatch(RadioAction.STOP)
+        self.radio.dispatch(RadioAction.STOP, user=interaction.user)
         await interaction.response.send_message(
             "⏹ Stopping playback...",
             ephemeral=True
@@ -225,7 +231,7 @@ class SkipButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
-            self.radio.dispatch(RadioAction.SKIP)
+            self.radio.dispatch(RadioAction.SKIP, user=interaction.user)
 
             await interaction.response.send_message(
                 "⏭ Skipping the current track...",
@@ -294,7 +300,7 @@ class SeekModal(Modal):
             )
             return
 
-        self.radio.dispatch(RadioAction.SEEK, total_seconds)
+        self.radio.dispatch(RadioAction.SEEK, total_seconds, user=interaction.user)
 
         await interaction.response.send_message(
             f"⏩ Jumping to {ts}...",
@@ -346,7 +352,7 @@ class VolumeModal(Modal):
             )
             return
 
-        self.radio.dispatch(RadioAction.SET_VOLUME, value / 100)
+        self.radio.dispatch(RadioAction.SET_VOLUME, value / 100, user=interaction.user)
 
         await interaction.response.send_message(
             f"🔊 Volume set to: {value}%",
@@ -385,6 +391,7 @@ class LikeButton(discord.ui.Button):
             updated_song = self.db.get_song_by_path(song_path)
 
             if updated_song:
+                self.radio.last_user = interaction.user
                 self.radio.current_song = updated_song
                 await update_now_playing(updated_song)
 
@@ -435,6 +442,7 @@ class DislikeButton(discord.ui.Button):
             updated_song = self.db.get_song_by_path(song_path)
 
             if updated_song:
+                self.radio.last_user = interaction.user
                 self.radio.current_song = updated_song
                 await update_now_playing(updated_song)
 

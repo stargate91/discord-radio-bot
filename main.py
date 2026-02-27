@@ -38,9 +38,12 @@ class RadioState:
         
         self.status = RadioStatusEnum.PLAYING
         self.action_queue = asyncio.Queue()
+        self.last_user: discord.Member | discord.User | None = None
 
-    def dispatch(self, action: RadioAction, data=None):
-        print(f"[ACTION] Dispatching: {action.name} with data: {data}")
+    def dispatch(self, action: RadioAction, data=None, user: discord.Member | discord.User | None = None):
+        print(f"[ACTION] Dispatching: {action.name} with data: {data} by user: {user}")
+        if user:
+            self.last_user = user
         self.action_queue.put_nowait((action, data))
 
 radio = RadioState()
