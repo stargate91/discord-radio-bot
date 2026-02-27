@@ -45,7 +45,7 @@ class RadioState:
 
     def refresh_queue(self):
         self.queue = []
-        for _ in range(11):  # 1 for current, 10 for up next
+        for _ in range(11):
             song = get_random_song_by_genre(self.genre)
             if song:
                 self.queue.append(song)
@@ -139,7 +139,6 @@ async def radio_player():
                 
                 if radio.queue:
                     song = radio.queue.pop(0)
-                    # Refill queue
                     new_song = get_random_song_by_genre(radio.genre)
                     if new_song:
                         radio.queue.append(new_song)

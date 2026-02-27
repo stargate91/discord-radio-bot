@@ -105,7 +105,6 @@ async def update_now_playing(song: dict):
     player_embed = build_embed(song)
     queue_embed = build_queue_embed(radio.queue, song)
 
-    # Handle Player Message
     if not radio.now_playing_message:
         message_id = embed_state.load_message_id("player")
         if message_id:
@@ -129,7 +128,6 @@ async def update_now_playing(song: dict):
         radio.now_playing_message = msg
         embed_state.save_message_id("player", msg.id)
 
-    # Handle Queue Message
     if radio.show_queue:
         if not radio.queue_message:
             message_id = embed_state.load_message_id("queue")
@@ -150,7 +148,6 @@ async def update_now_playing(song: dict):
             radio.queue_message = msg
             embed_state.save_message_id("queue", msg.id)
     else:
-        # Hide/Delete queue if it exists
         if radio.queue_message:
             try:
                 await radio.queue_message.delete()
@@ -160,19 +157,11 @@ async def update_now_playing(song: dict):
             
         old_queue_id = embed_state.load_message_id("queue")
         if old_queue_id:
-            # We don't necessarily delete the message from Discord here to avoid lag, 
-            # but we clear the state so it won't be edited anymore.
-            # Actually, let's try to delete it to be clean.
             try:
                 m = await channel.fetch_message(old_queue_id)
                 await m.delete()
             except:
                 pass
-            
-        # Clear message ID from state so it's not "dead" weight
-        # Note: save_message_id with None isn't explicitly supported but _load_data and pop could be used.
-        # For now, let's just leave it, it's not a huge issue since load_message_id with "queue" 
-        # is only called when show_queue is True.
 
 def build_queue_embed(queue: list[dict], current_song: dict) -> discord.Embed:
     embed = discord.Embed(
@@ -182,13 +171,11 @@ def build_queue_embed(queue: list[dict], current_song: dict) -> discord.Embed:
     
     lines = []
     
-    # Highlight current song
     if current_song:
         artist = current_song.get("artist", "Unknown")
         title = current_song.get("title", "Unknown")
         lines.append(f"▶️ **{artist} - {title}** *(Now Playing)*")
-    
-    # List next 10
+
     for i, song in enumerate(queue[:10], 1):
         artist = song.get("artist", "Unknown")
         title = song.get("title", "Unknown")
@@ -198,7 +185,7 @@ def build_queue_embed(queue: list[dict], current_song: dict) -> discord.Embed:
         lines.append("*The queue is currently empty.*")
         
     embed.description = "\n".join(lines)
-    embed.set_footer(text=f"Total songs in library: {len(db.get_all_genres())} genres") # Placeholder or more useful info
+    embed.set_footer(text=f"Total songs in library: {len(db.get_all_genres())} genres")
     
     return embed
 
@@ -207,7 +194,6 @@ async def force_new_embed():
     if not channel:
         return
 
-    # Delete player msg
     old_player_id = embed_state.load_message_id("player")
     if old_player_id:
         try:
@@ -216,7 +202,6 @@ async def force_new_embed():
         except:
             pass
     
-    # Delete queue msg
     old_queue_id = embed_state.load_message_id("queue")
     if old_queue_id:
         try:
@@ -259,10 +244,8 @@ class QueueToggleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         self.radio.show_queue = not self.radio.show_queue
         
-        # Immediate label update
         self.label = "📋 Hide Queue" if self.radio.show_queue else "📋 Show Queue"
         
-        # Update both embeds
         await update_now_playing(self.radio.current_song)
         
         await interaction.response.send_message(
@@ -357,11 +340,25 @@ class PauseButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        self.radio.dispatch(RadioAction.PAUSE, user=interaction.user)
-        await interaction.response.send_message(
-            "⏸ Pausing playback...",
-            ephemeral=True
-        )
+        if self.radio.status == RadioStatusEnum.IDLE:
+            await interaction.response.send_message(
+                "❌ Stopped music cannot be paused",
+                ephemeral=True
+            )
+            return
+
+        if self.radio.status == RadioStatusEnum.PAUSED:
+            self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
+            await interaction.response.send_message(
+                "▶ Resuming playback...",
+                ephemeral=True
+            )
+        else:
+            self.radio.dispatch(RadioAction.PAUSE, user=interaction.user)
+            await interaction.response.send_message(
+                "⏸ Pausing playback...",
+                ephemeral=True
+            )
 
 class StopButton(discord.ui.Button):
     def __init__(self, radio):
@@ -412,6 +409,13 @@ class SeekButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
+        if self.radio.status == RadioStatusEnum.IDLE:
+            await interaction.response.send_message(
+                "❌ Cannot seek while the radio is stopped",
+                ephemeral=True
+            )
+            return
+
         modal = SeekModal(self.radio)
         await interaction.response.send_modal(modal)
 
@@ -556,7 +560,7 @@ class LikeButton(discord.ui.Button):
                 msg = f"❤️ Liked: **{artist} - {title}**"
             elif status == "removed":
                 msg = f"❤️ Like withdrawn: **{artist} - {title}**"
-            else:  # changed
+            else:
                 msg = f"❤️ Liked (replaced dislike): **{artist} - {title}**"
 
             await interaction.response.send_message(msg, ephemeral=True)
@@ -604,7 +608,7 @@ class DislikeButton(discord.ui.Button):
                 msg = f"👎 Disliked: **{artist} - {title}**"
             elif status == "removed":
                 msg = f"👎 Dislike withdrawn: **{artist} - {title}**"
-            else:  # changed
+            else:
                 msg = f"👎 Disliked (replaced like): **{artist} - {title}**"
 
             await interaction.response.send_message(msg, ephemeral=True)
@@ -648,7 +652,6 @@ class QueueToggleButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         self.radio.show_queue = not self.radio.show_queue
         
-        # Update both embeds
         await update_now_playing(self.radio.current_song)
         
         await interaction.response.send_message(
