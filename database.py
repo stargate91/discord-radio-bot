@@ -51,6 +51,14 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_genre ON songs(genre)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_artist ON songs(artist)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_album ON songs(album)")
+            
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS song_covers (
+                song_path TEXT PRIMARY KEY,
+                cover_path TEXT,
+                FOREIGN KEY(song_path) REFERENCES songs(path) ON DELETE CASCADE
+            )
+            """)
 
     def is_empty(self) -> bool:
 
@@ -205,3 +213,26 @@ class DatabaseManager:
                 
             conn.commit()
             return status
+
+    def get_song_cover_path(self, song_path: str) -> str | None:
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT cover_path FROM song_covers WHERE song_path = ?", (song_path,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def save_song_cover_path(self, song_path: str, cover_path: str, cursor=None):
+        if cursor:
+            cursor.execute("""
+                INSERT OR REPLACE INTO song_covers (song_path, cover_path)
+                VALUES (?, ?)
+            """, (song_path, cover_path))
+            return
+
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO song_covers (song_path, cover_path)
+                VALUES (?, ?)
+            """, (song_path, cover_path))
+            conn.commit()

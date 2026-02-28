@@ -3,6 +3,8 @@ from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from discord.ui import Modal, TextInput
 from pathlib import Path
 from embed_state import EmbedStateManager
+from scanner import get_cover_art, find_and_save_cover
+import io
 
 embed_state = EmbedStateManager()
 
@@ -143,6 +145,55 @@ async def update_now_playing(song: dict):
             except:
                 pass
 
+    if radio.show_details:
+        detailed_embed = build_detailed_embed(song)
+        
+        cover_path = db.get_song_cover_path(song["path"])
+        file = None
+        if cover_path and Path(cover_path).exists():
+            file = discord.File(cover_path, filename="cover.png")
+            detailed_embed.set_image(url="attachment://cover.png")
+        else:
+            temp_path = find_and_save_cover(Path(song["path"]), db)
+            if temp_path:
+                db.save_song_cover_path(song["path"], temp_path)
+                file = discord.File(temp_path, filename="cover.png")
+                detailed_embed.set_image(url="attachment://cover.png")
+
+        if not radio.details_message:
+            message_id = embed_state.load_message_id("details")
+            if message_id:
+                try:
+                    radio.details_message = await channel.fetch_message(message_id)
+                except:
+                    radio.details_message = None
+
+        if radio.details_message:
+            try:
+                await radio.details_message.edit(embed=detailed_embed, attachments=[file] if file else [])
+            except:
+                radio.details_message = None
+
+        if not radio.details_message:
+            msg = await channel.send(embed=detailed_embed, file=file)
+            radio.details_message = msg
+            embed_state.save_message_id("details", msg.id)
+    else:
+        if radio.details_message:
+            try:
+                await radio.details_message.delete()
+            except:
+                pass
+            radio.details_message = None
+            
+        old_details_id = embed_state.load_message_id("details")
+        if old_details_id:
+            try:
+                m = await channel.fetch_message(old_details_id)
+                await m.delete()
+            except:
+                pass
+
 def build_queue_embed(queue: list[dict], current_song: dict) -> discord.Embed:
     embed = discord.Embed(
         title="⏭️ UP NEXT",
@@ -190,8 +241,17 @@ async def force_new_embed():
         except:
             pass
 
+    old_details_id = embed_state.load_message_id("details")
+    if old_details_id:
+        try:
+            old_msg = await channel.fetch_message(old_details_id)
+            await old_msg.delete()
+        except:
+            pass
+
     radio.now_playing_message = None
     radio.queue_message = None
+    radio.details_message = None
 
     if radio.current_song:
         await update_now_playing(radio.current_song)
@@ -588,15 +648,14 @@ class DetailsButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        if not self.radio.current_song:
-            await interaction.response.send_message(
-                "❌ No song is currently playing",
-                ephemeral=True
-            )
-            return
-
-        embed = build_detailed_embed(self.radio.current_song)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        self.radio.show_details = not self.radio.show_details
+        
+        await update_now_playing(self.radio.current_song)
+        
+        await interaction.response.send_message(
+            f"📂 Info visibility: **{'Shown' if self.radio.show_details else 'Hidden'}**",
+            ephemeral=True
+        )
 
 class QueueToggleButton(discord.ui.Button):
     def __init__(self, radio):

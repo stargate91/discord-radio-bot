@@ -1,6 +1,67 @@
 import os
 from pathlib import Path
 from mutagen import File as MutagenFile
+from mutagen.id3 import ID3, APIC
+from mutagen.flac import FLAC, Picture
+
+import hashlib
+
+def get_cover_art(file_path: Path) -> bytes | None:
+    folder = file_path.parent
+    cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
+    
+    for name in cover_names:
+        cover_path = folder / name
+        if cover_path.exists():
+            return cover_path.read_bytes()
+            
+    try:
+        audio = MutagenFile(file_path)
+        if audio is None:
+            return None
+            
+        if isinstance(audio, FLAC):
+            if audio.pictures:
+                return audio.pictures[0].data
+        elif isinstance(audio, ID3):
+            for tag in audio.values():
+                if isinstance(tag, APIC):
+                    return tag.data
+        elif hasattr(audio, "tags") and audio.tags:
+            for tag in audio.tags.values():
+                if hasattr(tag, "data") and (isinstance(tag, APIC) or "PIC" in str(type(tag))):
+                    return tag.data
+    except Exception as e:
+        print(f"Error extracting cover art: {e}")
+        
+    return None
+
+def find_and_save_cover(file_path: Path, db) -> str | None:
+    folder = file_path.parent
+    cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
+    
+    for name in cover_names:
+        cover_path = folder / name
+        if cover_path.exists():
+            return str(cover_path)
+            
+    art_bytes = get_cover_art(file_path)
+    if not art_bytes:
+        return None
+        
+    cache_dir = Path("data/covers")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_hash = hashlib.md5(str(file_path).encode()).hexdigest()
+    ext = "png"
+    if art_bytes.startswith(b'\xff\xd8'): ext = "jpg"
+    elif art_bytes.startswith(b'\x89PNG'): ext = "png"
+    
+    cache_path = cache_dir / f"{file_hash}.{ext}"
+    if not cache_path.exists():
+        cache_path.write_bytes(art_bytes)
+        
+    return str(cache_path)
 
 def safe_int(value):
     try:
@@ -134,6 +195,9 @@ def scan_music_library(config, db):
 
                         if inserted_flag:
                             inserted += 1
+                            cover_path = find_and_save_cover(full_path, db)
+                            if cover_path:
+                                db.save_song_cover_path(str(full_path), cover_path, cursor=cursor)
 
         conn.commit()
 

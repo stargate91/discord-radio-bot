@@ -38,6 +38,8 @@ class RadioState:
         self.queue_message: discord.Message | None = None
         self.queue: list[dict] = []
         self.show_queue: bool = False
+        self.show_details: bool = False
+        self.details_message: discord.Message | None = None
         
         self.status = RadioStatusEnum.PLAYING
         self.action_queue = asyncio.Queue()
