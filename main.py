@@ -1,12 +1,13 @@
 from config_loader import load_config
 from database import DatabaseManager
 from scanner import scan_music_library
-from ui import update_now_playing, force_new_embed, RadioControlView
+from ui import update_now_playing, force_new_embed, UnifiedStandbyView, FrequencyStationView, NowPlayingView
 from ui import init_ui
 import asyncio
 import discord
 
 from radio_actions import RadioState as RadioStatusEnum, RadioAction
+from embed_state import EmbedStateManager
 import asyncio
 
 config = load_config()
@@ -25,7 +26,9 @@ bot = discord.Client(intents=intents)
 
 class RadioState:
     def __init__(self):
+        self.embed_manager = EmbedStateManager()
         self.voice: discord.VoiceClient | None = None
+        self.voice_channel_id: int | None = None
         self.genre: str = config.default_genre
         self.task: asyncio.Task | None = None
         self.skip_event: asyncio.Event = asyncio.Event()
@@ -35,6 +38,7 @@ class RadioState:
         self.skip_notification: bool = False
         self.volume: float = 0.5
         self.now_playing_message: discord.Message | None = None
+        self.station_message: discord.Message | None = None
         self.queue_message: discord.Message | None = None
         self.queue: list[dict] = []
         self.show_queue: bool = False
@@ -44,6 +48,7 @@ class RadioState:
         self.status = RadioStatusEnum.PLAYING
         self.action_queue = asyncio.Queue()
         self.last_user: discord.Member | discord.User | None = None
+        self.language: str = "en"
 
     def refresh_queue(self):
         self.queue = []
@@ -69,8 +74,11 @@ def get_random_song_by_genre(genre: str):
 
 
 async def ensure_voice():
+    if not radio.voice_channel_id:
+        return None
+
     guild = bot.get_guild(config.guild_id)
-    channel = guild.get_channel(config.voice_channel_id)
+    channel = guild.get_channel(radio.voice_channel_id)
 
     if not channel:
         print("❌ Voice channel not found")
@@ -93,7 +101,15 @@ async def radio_player():
         try:
             voice = await ensure_voice()
             if not voice:
-                await asyncio.sleep(5)
+                action, data = await radio.action_queue.get()
+                if action == RadioAction.JOIN:
+                    radio.voice_channel_id = data
+                    radio.embed_manager.save_value("voice_channel_id", data)
+                    await update_now_playing(radio.current_song or {})
+                elif action == RadioAction.SET_LANGUAGE:
+                    radio.language = data
+                    print(f"DEBUG: Language changed to: {data}")
+                    await update_now_playing(radio.current_song or {})
                 continue
 
             if radio.status == RadioStatusEnum.IDLE:
@@ -111,6 +127,14 @@ async def radio_player():
                     radio.seek_position = 0
                 elif action == RadioAction.SKIP:
                     radio.is_seeking = False
+                elif action == RadioAction.JOIN:
+                    radio.voice_channel_id = data
+                    radio.embed_manager.save_value("voice_channel_id", data)
+                    continue
+                elif action == RadioAction.SET_LANGUAGE:
+                    radio.language = data
+                    await update_now_playing(radio.current_song or {})
+                    continue
                 else:
                     continue
                 
@@ -129,6 +153,22 @@ async def radio_player():
                 elif action == RadioAction.STOP:
                     radio.status = RadioStatusEnum.IDLE
                     radio.refresh_queue()
+                elif action == RadioAction.JOIN:
+                    radio.voice_channel_id = data
+                    radio.embed_manager.save_value("voice_channel_id", data)
+                    print(f"[ACTION HANDLED] JOIN: Voice channel set to {data}")
+                elif action == RadioAction.DISCONNECT:
+                    radio.voice_channel_id = None
+                    radio.embed_manager.save_value("voice_channel_id", None)
+                    if radio.voice:
+                        await radio.voice.disconnect()
+                        radio.voice = None
+                    await update_now_playing(radio.current_song or {})
+                    print(f"[ACTION HANDLED] DISCONNECT: Voice client disconnected")
+                elif action == RadioAction.SET_LANGUAGE:
+                    radio.language = data
+                    await update_now_playing(radio.current_song or {})
+                    print(f"[ACTION HANDLED] SET_LANGUAGE: Language set to {data}")
 
             if radio.status == RadioStatusEnum.IDLE:
                 continue
@@ -255,6 +295,25 @@ async def radio_player():
                             voice.stop()
                             await update_now_playing(song)
                             break
+                        elif action == RadioAction.JOIN:
+                            radio.voice_channel_id = data
+                            radio.embed_manager.save_value("voice_channel_id", data)
+                            guild = bot.get_guild(config.guild_id)
+                            channel = guild.get_channel(data)
+                            if voice.channel.id != data:
+                                await voice.move_to(channel)
+                            await update_now_playing(song)
+                        elif action == RadioAction.SET_LANGUAGE:
+                            radio.language = data
+                            await update_now_playing(song)
+                        elif action == RadioAction.DISCONNECT:
+                            radio.voice_channel_id = None
+                            radio.embed_manager.save_value("voice_channel_id", None)
+                            voice.stop()
+                            await radio.voice.disconnect()
+                            radio.voice = None
+                            await update_now_playing(song)
+                            break
                         elif action == RadioAction.SET_GENRE:
                             radio.genre = data
                             radio.is_seeking = False
@@ -294,7 +353,9 @@ async def embed_refresh_loop():
 async def on_ready():
     print(f"Online as: {bot.user}")
 
-    bot.add_view(RadioControlView(radio, db))
+    bot.add_view(UnifiedStandbyView(radio))
+    bot.add_view(FrequencyStationView(radio))
+    bot.add_view(NowPlayingView(radio, db))
 
     await force_new_embed()
 

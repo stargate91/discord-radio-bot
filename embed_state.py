@@ -10,17 +10,23 @@ class EmbedStateManager:
 
         self.file_path = data_dir / file_path
 
-    def save_message_id(self, key: str, message_id: int):
+    def save_value(self, key: str, value):
         data = self._load_data()
-        data[key] = message_id
+        data[key] = value
         
         temp_file = self.file_path.with_suffix(".tmp")
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f)
         os.replace(temp_file, self.file_path)
 
+    def load_value(self, key: str, default=None):
+        return self._load_data().get(key, default)
+
+    def save_message_id(self, key: str, message_id: int):
+        self.save_value(key, message_id)
+
     def load_message_id(self, key: str) -> int | None:
-        return self._load_data().get(key)
+        return self.load_value(key)
 
     def _load_data(self) -> dict:
         try:

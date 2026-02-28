@@ -13,3 +13,6 @@ class RadioAction(Enum):
     REPLAY = auto()
     STOP = auto()
     PAUSE = auto()
+    JOIN = auto()
+    DISCONNECT = auto()
+    SET_LANGUAGE = auto()
