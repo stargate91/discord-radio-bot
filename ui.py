@@ -22,26 +22,6 @@ def format_duration(seconds: int):
     m, s = divmod(seconds, 60)
     return f"{m}:{s:02d}"
 
-class DetailsButton(discord.ui.Button):
-    def __init__(self, radio):
-        super().__init__(
-            label="📂 Details",
-            style=discord.ButtonStyle.secondary,
-            custom_id="details_button"
-        )
-        self.radio = radio
-
-    async def callback(self, interaction: discord.Interaction):
-        if not self.radio.current_song:
-            await interaction.response.send_message(
-                "❌ No song is currently playing",
-                ephemeral=True
-            )
-            return
-
-        embed = build_detailed_embed(self.radio.current_song)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
 def fixed(text: str, length: int = 42):
     text = str(text)
 
@@ -230,28 +210,6 @@ class RadioControlView(discord.ui.View):
         self.add_item(DislikeButton(radio, db))
         self.add_item(DetailsButton(radio))
         self.add_item(QueueToggleButton(radio))
-
-class QueueToggleButton(discord.ui.Button):
-    def __init__(self, radio):
-        label = "📋 Hide Queue" if radio.show_queue else "📋 Show Queue"
-        super().__init__(
-            label=label,
-            style=discord.ButtonStyle.secondary,
-            custom_id="queue_toggle_button"
-        )
-        self.radio = radio
-
-    async def callback(self, interaction: discord.Interaction):
-        self.radio.show_queue = not self.radio.show_queue
-        
-        self.label = "📋 Hide Queue" if self.radio.show_queue else "📋 Show Queue"
-        
-        await update_now_playing(self.radio.current_song)
-        
-        await interaction.response.send_message(
-            f"📋 Queue visibility: **{'Shown' if self.radio.show_queue else 'Hidden'}**",
-            ephemeral=True
-        )
 
 def build_detailed_embed(song: dict) -> discord.Embed:
     embed = discord.Embed(
