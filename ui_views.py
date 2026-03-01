@@ -8,7 +8,8 @@ from ui_components import (
     StationSelect, LanguageSelect, DisconnectButton, GenreSelect, 
     PlayButton, PauseButton, StopButton, SkipButton, SeekButton, 
     VolumeButton, LikeButton, DislikeButton, DetailsButton, 
-    QueueToggleButton, SearchButton, AddSongButton, QueueAllButton
+    QueueToggleButton, SearchButton, AddSongButton, QueueAllButton,
+    TabButton, SearchBySelectionButton
 )
 
 _bot_ref = None
@@ -165,30 +166,32 @@ class NowPlayingView(discord.ui.LayoutView):
         self.add_item(master_container)
 
 class SearchResultsView(discord.ui.LayoutView):
-    def __init__(self, radio, db, results, query, user, page=0):
-        super().__init__(timeout=180)
+    def __init__(self, radio, db, results, query, user, page=0, search_type="songs"):
+        super().__init__(timeout=None)
         self.radio = radio
         self.db = db
         self.results = results
         self.query = query
         self.user = user
         self.page = page
+        self.search_type = search_type
         self.language = radio.language
         self.items_per_page = 5
-        self.total_pages = (len(results) - 1) // self.items_per_page + 1
+        self.total_pages = (len(results) - 1) // self.items_per_page + 1 if results else 1
 
         print(f"[SEARCH VIEW] Initializing. Radio lang: {self.radio.language}, Translation test ('songs_tab'): {t('songs_tab')}")
 
         container = Container(accent_color=0x2b2d31)
         
         tab_row = ActionRow()
-        tab_row.add_item(discord.ui.Button(label=t("songs_tab"), style=discord.ButtonStyle.primary, custom_id="songs_tab", disabled=True))
-        tab_row.add_item(discord.ui.Button(label=t("artists_tab"), style=discord.ButtonStyle.secondary, custom_id="artists_tab", disabled=True))
-        tab_row.add_item(discord.ui.Button(label=t("albums_tab"), style=discord.ButtonStyle.secondary, custom_id="albums_tab", disabled=True))
-        tab_row.add_item(discord.ui.Button(label=t("playlists_tab"), style=discord.ButtonStyle.secondary, custom_id="playlists_tab", disabled=True))
+        tab_row.add_item(TabButton(radio, db, t("songs_tab"), "songs", query, user, active=(search_type == "songs")))
+        tab_row.add_item(TabButton(radio, db, t("artists_tab"), "artists", query, user, active=(search_type == "artists")))
+        tab_row.add_item(TabButton(radio, db, t("albums_tab"), "albums", query, user, active=(search_type == "albums")))
+        tab_row.add_item(discord.ui.Button(label=t("playlists_tab"), style=discord.ButtonStyle.secondary, disabled=True))
         
         close_btn = discord.ui.Button(emoji="❌", style=discord.ButtonStyle.secondary, custom_id="close_search")
         async def close_callback(interaction):
+             await interaction.response.defer()
              from ui import embed_state
              embed_state.save_message_id("search", None)
              await interaction.message.delete()
@@ -197,14 +200,28 @@ class SearchResultsView(discord.ui.LayoutView):
         container.add_item(tab_row)
         container.add_item(Separator())
 
-        start = self.page * self.items_per_page
-        end = start + self.items_per_page
-        page_results = self.results[start:end]
+        if not self.results:
+            container.add_item(TextDisplay(f"*{t('search_no_results')}*"))
+        else:
+            start = self.page * self.items_per_page
+            end = start + self.items_per_page
+            page_results = self.results[start:end]
 
-        for i, song in enumerate(page_results, start + 1):
-            song_info = f"**{i}. {song['title']}**{song['artist']} • {format_duration(song['duration'])}"
-            section = Section(song_info, accessory=AddSongButton(radio, song))
-            container.add_item(section)
+            for i, item in enumerate(page_results, start + 1):
+                if self.search_type == "songs":
+                    song_info = f"**{i}. {item['title']}** {item['artist']} • {format_duration(item['duration'])}"
+                    section = Section(song_info, accessory=AddSongButton(radio, item))
+                    container.add_item(section)
+                elif self.search_type == "artists":
+                    container.add_item(TextDisplay(f"**{i}. {item}**"))
+                    row = ActionRow()
+                    row.add_item(SearchBySelectionButton(radio, db, t("songs_tab"), "artist_songs", item, user))
+                    row.add_item(SearchBySelectionButton(radio, db, t("albums_tab"), "artist_albums", item, user))
+                    container.add_item(row)
+                elif self.search_type == "albums":
+                    album_info = f"**{i}. {item['album']}** {item['artist']}"
+                    section = Section(album_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "album_songs", (item['artist'], item['album']), user))
+                    container.add_item(section)
 
         container.add_item(Separator())
         
@@ -215,22 +232,25 @@ class SearchResultsView(discord.ui.LayoutView):
         
         prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
         async def prev_callback(interaction):
+            await interaction.response.defer()
             self.page -= 1
-            await self.update_view(interaction)
+            await self.update_view(interaction, use_followup=True)
         prev_btn.callback = prev_callback
         nav_row.add_item(prev_btn)
 
         next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
         async def next_callback(interaction):
+            await interaction.response.defer()
             self.page += 1
-            await self.update_view(interaction)
+            await self.update_view(interaction, use_followup=True)
         next_btn.callback = next_callback
         nav_row.add_item(next_btn)
         
         last_btn = discord.ui.Button(label=t("last_label"), style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
         async def last_callback(interaction):
+            await interaction.response.defer()
             self.page = self.total_pages - 1
-            await self.update_view(interaction)
+            await self.update_view(interaction, use_followup=True)
         last_btn.callback = last_callback
         nav_row.add_item(last_btn)
 
@@ -238,15 +258,19 @@ class SearchResultsView(discord.ui.LayoutView):
         
         reset_btn = discord.ui.Button(label=t("reset_radio_label"), emoji="🔄", style=discord.ButtonStyle.secondary)
         async def reset_callback(interaction):
+             await interaction.response.defer(ephemeral=True)
              self.radio.queue = []
              self.radio.dispatch(RadioAction.SKIP, user=interaction.user)
-             await interaction.response.send_message(t("radio_reset_feedback"), ephemeral=True)
+             await interaction.followup.send(t("radio_reset_feedback"), ephemeral=True)
         reset_btn.callback = reset_callback
         nav_row.add_item(reset_btn)
 
         container.add_item(nav_row)
         self.add_item(container)
 
-    async def update_view(self, interaction):
-        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page)
-        await interaction.response.edit_message(view=new_view)
+    async def update_view(self, interaction, use_followup=False):
+        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type)
+        if use_followup:
+            await interaction.edit_original_response(view=new_view)
+        else:
+            await interaction.response.edit_message(view=new_view)

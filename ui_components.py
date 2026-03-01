@@ -256,6 +256,8 @@ class LikeButton(discord.ui.Button):
         if not self.radio.current_song:
             await interaction.response.send_message(t("no_playing_error"), ephemeral=True)
             return
+            
+        await interaction.response.defer(ephemeral=True)
         song_path = self.radio.current_song.get("path")
         try:
             status = self.db.toggle_rating(interaction.user.id, song_path, 'like')
@@ -269,10 +271,10 @@ class LikeButton(discord.ui.Button):
             if status == "added": msg = f"{t('liked')} **{artist} - {title}**"
             elif status == "removed": msg = f"{t('like_withdrawn')} **{artist} - {title}**"
             else: msg = f"{t('liked_replaced')} **{artist} - {title}**"
-            await interaction.response.send_message(msg, ephemeral=True)
+            await interaction.followup.send(msg, ephemeral=True)
         except Exception as e:
             print(f"Like error: {e}")
-            await interaction.response.send_message(t("record_error"), ephemeral=True)
+            await interaction.followup.send(t("record_error"), ephemeral=True)
 
 class DislikeButton(discord.ui.Button):
     def __init__(self, radio, db):
@@ -288,6 +290,8 @@ class DislikeButton(discord.ui.Button):
         if not self.radio.current_song:
             await interaction.response.send_message(t("no_playing_error"), ephemeral=True)
             return
+            
+        await interaction.response.defer(ephemeral=True)
         song_path = self.radio.current_song.get("path")
         try:
             status = self.db.toggle_rating(interaction.user.id, song_path, 'dislike')
@@ -301,10 +305,10 @@ class DislikeButton(discord.ui.Button):
             if status == "added": msg = f"{t('disliked')} **{artist} - {title}**"
             elif status == "removed": msg = f"{t('dislike_withdrawn')} **{artist} - {title}**"
             else: msg = f"{t('disliked_replaced')} **{artist} - {title}**"
-            await interaction.response.send_message(msg, ephemeral=True)
+            await interaction.followup.send(msg, ephemeral=True)
         except Exception as e:
             print(f"Dislike error: {e}")
-            await interaction.response.send_message(t("record_error"), ephemeral=True)
+            await interaction.followup.send(t("record_error"), ephemeral=True)
 
 class DetailsButton(discord.ui.Button):
     def __init__(self, radio):
@@ -316,9 +320,10 @@ class DetailsButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         self.radio.show_details = not self.radio.show_details
         if _update_callback: await _update_callback(self.radio.current_song)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"📂 {t('info_visibility')}: **{t('shown') if self.radio.show_details else t('hidden')}**",
             ephemeral=True
         )
@@ -333,9 +338,10 @@ class QueueToggleButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         self.radio.show_queue = not self.radio.show_queue
         if _update_callback: await _update_callback(self.radio.current_song)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"📋 {t('queue_visibility')}: **{t('shown') if self.radio.show_queue else t('hidden')}**",
             ephemeral=True
         )
@@ -411,11 +417,68 @@ class AddSongButton(discord.ui.Button):
         self.song = song
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         self.radio.dispatch(RadioAction.ADD_TO_QUEUE, self.song, user=interaction.user)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"{t('add_to_queue')} **{self.song['artist']} - {self.song['title']}**",
             ephemeral=True
         )
+
+class TabButton(discord.ui.Button):
+    def __init__(self, radio, db, label, search_type, query, user, active=False):
+        style = discord.ButtonStyle.primary if active else discord.ButtonStyle.secondary
+        super().__init__(label=label, style=style, disabled=active)
+        self.radio = radio
+        self.db = db
+        self.search_type = search_type
+        self.query = query
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        from ui_views import SearchResultsView
+        from ui import init_translate
+        
+        init_translate(self.radio)
+        
+        results = []
+        if self.search_type == "songs":
+            results = self.db.search_songs(self.query)
+        elif self.search_type == "artists":
+            results = self.db.search_artists(self.query)
+        elif self.search_type == "albums":
+            results = self.db.search_albums(self.query)
+            
+        view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type)
+        await interaction.response.edit_message(view=view)
+
+class SearchBySelectionButton(discord.ui.Button):
+    def __init__(self, radio, db, label, search_type, value, user):
+        super().__init__(label=fixed(label, 20).strip(), style=discord.ButtonStyle.secondary)
+        self.radio = radio
+        self.db = db
+        self.search_type = search_type
+        self.value = value
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        from ui_views import SearchResultsView
+        from ui import init_translate
+        
+        init_translate(self.radio)
+        
+        results = []
+        new_search_type = "songs"
+        if self.search_type == "artist_songs":
+            results = self.db.search_by_artist(self.value)
+        elif self.search_type == "artist_albums":
+            results = self.db.get_albums_by_artist(self.value)
+            new_search_type = "albums"
+        elif self.search_type == "album_songs":
+            # value expects (artist, album)
+            results = self.db.search_by_album(self.value[0], self.value[1])
+            
+        view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type)
+        await interaction.response.edit_message(view=view)
 
 class QueueAllButton(discord.ui.Button):
     def __init__(self, radio, songs):
@@ -428,9 +491,10 @@ class QueueAllButton(discord.ui.Button):
         self.songs = songs
 
     async def callback(self, interaction: discord.Interaction):
-        for song in self.songs:
+        await interaction.response.defer(ephemeral=True)
+        for song in reversed(self.songs):
             self.radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"{t('queue_all')}: {len(self.songs)} {t('results')}",
             ephemeral=True
         )

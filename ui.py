@@ -101,14 +101,8 @@ async def update_now_playing(song: dict):
         radio.now_playing_message = await channel.send(view=player_view, file=file)
     embed_state.save_message_id("player", radio.now_playing_message.id)
 
-    for key in ["queue", "details"]:
-        old_id = embed_state.load_message_id(key)
-        if old_id:
-            try:
-                m = await channel.fetch_message(old_id)
-                await m.delete()
-            except: pass
-            embed_state.save_message_id(key, None)
+    # Removed redundant 'queue' and 'details' message cleanup loop here
+    # as these are now consolidated into the player embed itself.
 
 async def force_new_embed():
     channel = bot.get_channel(config.radio_text_channel_id)

@@ -254,16 +254,98 @@ class DatabaseManager:
             cursor = conn.cursor()
 
             search_pattern = f"%{query}%"
+            start_pattern = f"{query}%"
             
             cursor.execute("""
-                SELECT *
+                SELECT *,
+                    CASE 
+                        WHEN artist = ? OR title = ? THEN 1
+                        WHEN artist LIKE ? OR title LIKE ? THEN 2
+                        ELSE 3
+                    END as priority
                 FROM songs
                 WHERE artist LIKE ? 
                    OR title LIKE ? 
                    OR album LIKE ? 
                    OR date LIKE ?
-                ORDER BY artist ASC, title ASC
-            """, (search_pattern, search_pattern, search_pattern, search_pattern))
+                ORDER BY priority ASC, artist ASC, title ASC
+            """, (query, query, start_pattern, start_pattern, search_pattern, search_pattern, search_pattern, search_pattern))
 
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
+
+    def search_by_artist(self, artist: str) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT *
+                FROM songs
+                WHERE artist = ?
+                ORDER BY title ASC
+            """, (artist,))
+
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def search_artists(self, query: str) -> list[str]:
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            search_pattern = f"%{query}%"
+            start_pattern = f"{query}%"
+            cursor.execute("""
+                SELECT DISTINCT artist,
+                    CASE 
+                        WHEN artist = ? THEN 1
+                        WHEN artist LIKE ? THEN 2
+                        ELSE 3
+                    END as priority
+                FROM songs
+                WHERE artist LIKE ?
+                ORDER BY priority ASC, artist ASC
+            """, (query, start_pattern, search_pattern))
+            return [row[0] for row in cursor.fetchall()]
+
+    def search_albums(self, query: str) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            search_pattern = f"%{query}%"
+            start_pattern = f"{query}%"
+            cursor.execute("""
+                SELECT DISTINCT artist, album,
+                    CASE 
+                        WHEN album = ? THEN 1
+                        WHEN album LIKE ? THEN 2
+                        ELSE 3
+                    END as priority
+                FROM songs
+                WHERE album LIKE ?
+                ORDER BY priority ASC, album ASC
+            """, (query, start_pattern, search_pattern))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def search_by_album(self, artist: str, album: str) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT *
+                FROM songs
+                WHERE artist = ? AND album = ?
+                ORDER BY title ASC
+            """, (artist, album))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_albums_by_artist(self, artist: str) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT artist, album
+                FROM songs
+                WHERE artist = ?
+                ORDER BY album ASC
+            """, (artist,))
+            return [dict(row) for row in cursor.fetchall()]
