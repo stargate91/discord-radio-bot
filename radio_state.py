@@ -1,0 +1,53 @@
+import asyncio
+import discord
+from radio_actions import RadioState as RadioStatusEnum, RadioAction
+from embed_state import EmbedStateManager
+
+class RadioState:
+    def __init__(self, config, db):
+        self.config = config
+        self.db = db
+        self.embed_manager = EmbedStateManager()
+        self.voice: discord.VoiceClient | None = None
+        self.voice_channel_id: int | None = None
+        self.genre: str = config.default_genre
+        self.task: asyncio.Task | None = None
+        self.skip_event: asyncio.Event = asyncio.Event()
+        self.current_song: dict | None = None
+        self.seek_position: int | None = None
+        self.is_seeking: bool = False
+        self.skip_notification: bool = False
+        self.volume: float = 0.5
+        self.now_playing_message: discord.Message | None = None
+        self.station_message: discord.Message | None = None
+        self.queue_message: discord.Message | None = None
+        self.queue: list[dict] = []
+        self.show_queue: bool = False
+        self.show_details: bool = False
+        self.details_message: discord.Message | None = None
+        self.last_search_query: str = None
+        self.last_search_results: list[dict] = None
+        self.last_search_user: discord.User | None = None
+        
+        self.status = RadioStatusEnum.PLAYING
+        self.action_queue = asyncio.Queue()
+        self.last_user: discord.Member | discord.User | None = None
+        self.language: str = "en"
+
+    def refresh_queue(self):
+        self.queue = []
+        for _ in range(11):
+            song = self.get_random_song_by_genre(self.genre)
+            if song:
+                self.queue.append(song)
+
+    def dispatch(self, action: RadioAction, data=None, user: discord.Member | discord.User | None = None):
+        print(f"[ACTION] Dispatching: {action.name} with data: {data} by user: {user}")
+        if user:
+            self.last_user = user
+        self.action_queue.put_nowait((action, data))
+
+    def get_random_song_by_genre(self, genre: str):
+        if genre.lower() == "levifav":
+            return self.db.get_random_song_by_rating(min_rating=5)
+        return self.db.get_random_song_by_genre(genre)

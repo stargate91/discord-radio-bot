@@ -51,6 +51,8 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_genre ON songs(genre)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_artist ON songs(artist)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_album ON songs(album)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_title ON songs(title)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_date ON songs(date)")
             
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS song_covers (
@@ -172,6 +174,15 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def get_song_by_id(self, song_id: int):
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT * FROM songs WHERE id = ?", (song_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def toggle_rating(self, user_id: int, song_path: str, rating_type: str):
         with self._connect() as conn:
             cursor = conn.cursor()
@@ -236,3 +247,23 @@ class DatabaseManager:
                 VALUES (?, ?)
             """, (song_path, cover_path))
             conn.commit()
+
+    def search_songs(self, query: str) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            search_pattern = f"%{query}%"
+            
+            cursor.execute("""
+                SELECT *
+                FROM songs
+                WHERE artist LIKE ? 
+                   OR title LIKE ? 
+                   OR album LIKE ? 
+                   OR date LIKE ?
+                ORDER BY artist ASC, title ASC
+            """, (search_pattern, search_pattern, search_pattern, search_pattern))
+
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
