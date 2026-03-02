@@ -439,6 +439,7 @@ class TabButton(discord.ui.Button):
         from ui import init_translate
         
         init_translate(self.radio)
+        await interaction.response.defer()
         
         results = []
         if self.search_type == "songs":
@@ -449,22 +450,24 @@ class TabButton(discord.ui.Button):
             results = self.db.search_albums(self.query)
             
         view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type)
-        await interaction.response.edit_message(view=view)
+        await interaction.edit_original_response(view=view)
 
 class SearchBySelectionButton(discord.ui.Button):
-    def __init__(self, radio, db, label, search_type, value, user):
+    def __init__(self, radio, db, label, search_type, value, user, original_query=None):
         super().__init__(label=fixed(label, 20).strip(), style=discord.ButtonStyle.secondary)
         self.radio = radio
         self.db = db
         self.search_type = search_type
         self.value = value
         self.user = user
+        self.original_query = original_query
 
     async def callback(self, interaction: discord.Interaction):
         from ui_views import SearchResultsView
         from ui import init_translate
         
         init_translate(self.radio)
+        await interaction.response.defer()
         
         results = []
         new_search_type = "songs"
@@ -474,11 +477,10 @@ class SearchBySelectionButton(discord.ui.Button):
             results = self.db.get_albums_by_artist(self.value)
             new_search_type = "albums"
         elif self.search_type == "album_songs":
-            # value expects (artist, album)
             results = self.db.search_by_album(self.value[0], self.value[1])
             
-        view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type)
-        await interaction.response.edit_message(view=view)
+        view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type, original_query=self.original_query)
+        await interaction.edit_original_response(view=view)
 
 class QueueAllButton(discord.ui.Button):
     def __init__(self, radio, songs):

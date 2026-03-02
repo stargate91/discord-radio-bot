@@ -188,8 +188,6 @@ async def radio_player():
             _radio_ref.status = RadioStatusEnum.PLAYING
             print("▶ Playing:", song)
 
-            _radio_ref.skip_event.clear()
-
             before_opts = "-nostdin -re"
             if _radio_ref.seek_position is not None:
                 before_opts += f" -ss {_radio_ref.seek_position}"
@@ -220,7 +218,6 @@ async def radio_player():
                 await asyncio.sleep(0.05)
 
             await _update_now_playing_fn(song)
-            _radio_ref.skip_notification = False
 
             song_duration = song.get("duration", 0)
             ten_percent_duration = int(song_duration * 0.1)
@@ -251,13 +248,11 @@ async def radio_player():
                         elif action == RadioAction.SEEK:
                             _radio_ref.seek_position = data
                             _radio_ref.is_seeking = True
-                            _radio_ref.skip_notification = True
                             voice.stop()
                             break
                         elif action == RadioAction.SET_VOLUME:
                             _radio_ref.volume = data
                             _radio_ref.is_seeking = True
-                            _radio_ref.skip_notification = True
                             voice.stop()
                             break
                         elif action == RadioAction.REPLAY:
@@ -268,7 +263,6 @@ async def radio_player():
                             else:
                                 _radio_ref.seek_position = 0
                                 _radio_ref.is_seeking = True
-                                _radio_ref.skip_notification = True
                                 voice.stop()
                                 break
                         elif action == RadioAction.PAUSE:

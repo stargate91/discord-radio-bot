@@ -166,12 +166,13 @@ class NowPlayingView(discord.ui.LayoutView):
         self.add_item(master_container)
 
 class SearchResultsView(discord.ui.LayoutView):
-    def __init__(self, radio, db, results, query, user, page=0, search_type="songs"):
+    def __init__(self, radio, db, results, query, user, page=0, search_type="songs", original_query=None):
         super().__init__(timeout=None)
         self.radio = radio
         self.db = db
         self.results = results
         self.query = query
+        self.original_query = original_query or query
         self.user = user
         self.page = page
         self.search_type = search_type
@@ -184,9 +185,9 @@ class SearchResultsView(discord.ui.LayoutView):
         container = Container(accent_color=0x2b2d31)
         
         tab_row = ActionRow()
-        tab_row.add_item(TabButton(radio, db, t("songs_tab"), "songs", query, user, active=(search_type == "songs")))
-        tab_row.add_item(TabButton(radio, db, t("artists_tab"), "artists", query, user, active=(search_type == "artists")))
-        tab_row.add_item(TabButton(radio, db, t("albums_tab"), "albums", query, user, active=(search_type == "albums")))
+        tab_row.add_item(TabButton(radio, db, t("songs_tab"), "songs", self.original_query, user, active=(search_type == "songs" and query == self.original_query)))
+        tab_row.add_item(TabButton(radio, db, t("artists_tab"), "artists", self.original_query, user, active=(search_type == "artists" and query == self.original_query)))
+        tab_row.add_item(TabButton(radio, db, t("albums_tab"), "albums", self.original_query, user, active=(search_type == "albums" and query == self.original_query)))
         tab_row.add_item(discord.ui.Button(label=t("playlists_tab"), style=discord.ButtonStyle.secondary, disabled=True))
         
         close_btn = discord.ui.Button(emoji="❌", style=discord.ButtonStyle.secondary, custom_id="close_search")
@@ -215,12 +216,12 @@ class SearchResultsView(discord.ui.LayoutView):
                 elif self.search_type == "artists":
                     container.add_item(TextDisplay(f"**{i}. {item}**"))
                     row = ActionRow()
-                    row.add_item(SearchBySelectionButton(radio, db, t("songs_tab"), "artist_songs", item, user))
-                    row.add_item(SearchBySelectionButton(radio, db, t("albums_tab"), "artist_albums", item, user))
+                    row.add_item(SearchBySelectionButton(radio, db, t("songs_tab"), "artist_songs", item, user, original_query=self.original_query))
+                    row.add_item(SearchBySelectionButton(radio, db, t("albums_tab"), "artist_albums", item, user, original_query=self.original_query))
                     container.add_item(row)
                 elif self.search_type == "albums":
                     album_info = f"**{i}. {item['album']}** {item['artist']}"
-                    section = Section(album_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "album_songs", (item['artist'], item['album']), user))
+                    section = Section(album_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "album_songs", (item['artist'], item['album']), user, original_query=self.original_query))
                     container.add_item(section)
 
         container.add_item(Separator())
@@ -269,7 +270,7 @@ class SearchResultsView(discord.ui.LayoutView):
         self.add_item(container)
 
     async def update_view(self, interaction, use_followup=False):
-        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type)
+        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type, original_query=self.original_query)
         if use_followup:
             await interaction.edit_original_response(view=new_view)
         else:

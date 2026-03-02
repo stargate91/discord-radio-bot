@@ -12,11 +12,9 @@ class RadioState:
         self.voice_channel_id: int | None = None
         self.genre: str = config.default_genre
         self.task: asyncio.Task | None = None
-        self.skip_event: asyncio.Event = asyncio.Event()
         self.current_song: dict | None = None
         self.seek_position: int | None = None
         self.is_seeking: bool = False
-        self.skip_notification: bool = False
         self.volume: float = 0.5
         self.now_playing_message: discord.Message | None = None
         self.station_message: discord.Message | None = None

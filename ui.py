@@ -1,12 +1,9 @@
 import discord
 from pathlib import Path
 from embed_state import EmbedStateManager
-from scanner import get_cover_art, find_and_save_cover
-import io
-
+from scanner import find_and_save_cover
 from ui_translate import t, init_translate
 from ui_utils import format_duration, fixed
-from ui_embeds import build_embed, build_detailed_embed, build_queue_embed, init_embeds
 from ui_components import init_components
 from ui_views import UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_views
 
@@ -25,7 +22,6 @@ def init_ui(_bot, _config, _radio, _db):
     db = _db
     
     init_translate(radio)
-    init_embeds(radio, db)
     init_components(update_now_playing)
     init_views(bot, config)
 
@@ -101,8 +97,6 @@ async def update_now_playing(song: dict):
         radio.now_playing_message = await channel.send(view=player_view, file=file)
     embed_state.save_message_id("player", radio.now_playing_message.id)
 
-    # Removed redundant 'queue' and 'details' message cleanup loop here
-    # as these are now consolidated into the player embed itself.
 
 async def force_new_embed():
     channel = bot.get_channel(config.radio_text_channel_id)
