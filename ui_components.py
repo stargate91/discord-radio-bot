@@ -170,7 +170,7 @@ class ForwardButton(discord.ui.Button):
 class RandomButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"🔀 {t('random_label')}",
+            label=f"🎲 {t('random_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="random_button"
         )
@@ -182,6 +182,19 @@ class RandomButton(discord.ui.Button):
             await interaction.response.send_message(t("randomizing"), ephemeral=True)
         else:
             await interaction.response.send_message(t("nothing_playing"), ephemeral=True)
+
+class ShuffleButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=f"🔀 {t('shuffle_label')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="shuffle_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.dispatch(RadioAction.SHUFFLE, user=interaction.user)
+        await interaction.response.send_message(t("shuffle_feedback"), ephemeral=True)
 
 class BackButton(discord.ui.Button):
     def __init__(self, radio, db):
@@ -422,6 +435,49 @@ class SearchButton(discord.ui.Button):
         modal = SearchModal(self.radio, self.db)
         await interaction.response.send_modal(modal)
 
+class QueueViewButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=f"📋 {t('full_queue_label')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="full_queue_view"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        from ui_views import FullQueueView
+        self.radio.active_view_type = "queue"
+        self.radio.last_queue_page = 0
+        view = FullQueueView(self.radio, page=0)
+        
+        from ui import embed_state
+        search_id = embed_state.load_message_id("search")
+        if search_id:
+            try:
+                msg = await interaction.channel.fetch_message(search_id)
+                await msg.delete()
+            except: pass
+        
+        msg = await interaction.followup.send(view=view, ephemeral=False, wait=True)
+        embed_state.save_message_id("search", msg.id)
+
+class RemoveFromQueueButton(discord.ui.Button):
+    def __init__(self, radio, song):
+        import random, string
+        unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+        super().__init__(
+            emoji="🗑️",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"remove_q_{song.get('id', 0)}_{unique}"
+        )
+        self.radio = radio
+        self.song = song
+
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.dispatch(RadioAction.REMOVE_FROM_QUEUE, self.song, user=interaction.user)
+        await interaction.response.send_message(t("song_removed_feedback"), ephemeral=True)
+
 class HistoryButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
@@ -596,7 +652,7 @@ class QueueAllButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        for song in reversed(self.songs):
+        for song in self.songs:
             self.radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
         await interaction.followup.send(
             f"{t('queue_all')}: {len(self.songs)} {t('results')}",

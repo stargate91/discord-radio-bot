@@ -97,6 +97,15 @@ async def update_now_playing(song: dict):
         radio.now_playing_message = await channel.send(view=player_view, file=file)
     embed_state.save_message_id("player", radio.now_playing_message.id)
 
+    if radio.active_view_type == "queue":
+        search_id = embed_state.load_message_id("search")
+        if search_id:
+            try:
+                msg = await channel.fetch_message(search_id)
+                from ui_views import FullQueueView
+                await msg.edit(view=FullQueueView(radio, page=radio.last_queue_page))
+            except: pass
+
 
 async def force_new_embed():
     channel = bot.get_channel(config.radio_text_channel_id)

@@ -317,6 +317,10 @@ async def radio_player():
                                             total_count = _radio_ref.db.get_history_count()
                                             view = HistoryView(_radio_ref, _radio_ref.db, history, total_count, page=_radio_ref.last_history_page)
                                             await msg.edit(view=view)
+                                        elif _radio_ref.active_view_type == "queue":
+                                            from ui_views import FullQueueView
+                                            view = FullQueueView(_radio_ref, page=_radio_ref.last_queue_page)
+                                            await msg.edit(view=view)
                                         elif _radio_ref.active_view_type == "search" and _radio_ref.last_search_query:
                                             view = SearchResultsView(_radio_ref, _radio_ref.db, _radio_ref.last_search_results, _radio_ref.last_search_query, _radio_ref.last_search_user, page=_radio_ref.last_search_page, search_type=_radio_ref.last_search_type)
                                             await msg.edit(view=view)
@@ -336,9 +340,15 @@ async def radio_player():
                             voice.stop()
                             break
                         elif action == RadioAction.ADD_TO_QUEUE:
-                            _radio_ref.queue.insert(0, data)
+                            data['manual'] = True
+                            
+                            _radio_ref.queue = [s for s in _radio_ref.queue if s.get('manual')]
+                            
+                            _radio_ref.queue.append(data)
+                            
                             await _update_now_playing_fn(song)
-                            print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} added to front of queue")
+                            
+                            print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} appended to manual queue")
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)
@@ -362,6 +372,14 @@ async def radio_player():
                             
                             voice.stop()
                             break
+                        elif action == RadioAction.SHUFFLE:
+                            import random
+                            random.shuffle(_radio_ref.queue)
+                            await _update_now_playing_fn(song)
+                        elif action == RadioAction.REMOVE_FROM_QUEUE:
+                            if data in _radio_ref.queue:
+                                _radio_ref.queue.remove(data)
+                                await _update_now_playing_fn(song)
                     
                     if done_task in finished:
                         break
