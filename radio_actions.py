@@ -17,3 +17,5 @@ class RadioAction(Enum):
     DISCONNECT = auto()
     SET_LANGUAGE = auto()
     ADD_TO_QUEUE = auto()
+    BACK = auto()
+    FORWARD = auto()

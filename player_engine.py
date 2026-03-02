@@ -169,6 +169,14 @@ async def radio_player():
                 
                 if _radio_ref.queue:
                     song = _radio_ref.queue.pop(0)
+                    
+                    if not _radio_ref.is_back_action and not _radio_ref.is_forward_action:
+                        _radio_ref.last_history_paths = []
+                        _radio_ref.forward_stack = []
+                    
+                    _radio_ref.is_back_action = False
+                    _radio_ref.is_forward_action = False
+                    
                     new_song = _radio_ref.get_random_song_by_genre(_radio_ref.genre)
                     if new_song:
                         _radio_ref.queue.append(new_song)
@@ -223,7 +231,13 @@ async def radio_player():
             ten_percent_duration = int(song_duration * 0.1)
             start_time = asyncio.get_event_loop().time()
 
+            history_saved = False
+
             while not done.is_set():
+                if not history_saved and (asyncio.get_event_loop().time() - start_time >= 2.0):
+                    user_id = _radio_ref.last_user.id if _radio_ref.last_user else None
+                    _db_ref.add_to_history(song["path"], user_id)
+                    history_saved = True
                 try:
                     action_task = asyncio.create_task(_radio_ref.action_queue.get())
                     done_task = asyncio.create_task(done.wait())
@@ -231,7 +245,7 @@ async def radio_player():
                     finished, pending = await asyncio.wait(
                         [action_task, done_task],
                         return_when=asyncio.FIRST_COMPLETED,
-                        timeout=5.0
+                        timeout=1.0
                     )
 
                     for task in pending:
@@ -243,6 +257,8 @@ async def radio_player():
                         
                         if action == RadioAction.SKIP:
                             _radio_ref.is_seeking = False
+                            _radio_ref.forward_stack = []
+                            _radio_ref.last_history_paths = []
                             voice.stop()
                             break
                         elif action == RadioAction.SEEK:
@@ -316,6 +332,30 @@ async def radio_player():
                             _radio_ref.queue.insert(0, data)
                             await _update_now_playing_fn(song)
                             print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} added to front of queue")
+                        elif action == RadioAction.BACK:
+                            if _radio_ref.current_song:
+                                _radio_ref.forward_stack.append(_radio_ref.current_song)
+                            
+                            _radio_ref.queue.insert(0, data)
+                            _radio_ref.is_seeking = False
+                            _radio_ref.is_back_action = True
+                            voice.stop()
+                            break
+                        elif action == RadioAction.FORWARD:
+                            _radio_ref.is_seeking = False
+                            if _radio_ref.forward_stack:
+                                next_song = _radio_ref.forward_stack.pop()
+                                _radio_ref.queue.insert(0, next_song)
+                                _radio_ref.is_forward_action = True
+                                
+                                if _radio_ref.last_history_paths:
+                                    _radio_ref.last_history_paths.pop()
+                            else:
+                                _radio_ref.is_forward_action = False
+                                # Normal skip logic is implicit by stopping voice without is_forward_action
+                            
+                            voice.stop()
+                            break
                     
                     if done_task in finished:
                         break
@@ -325,9 +365,9 @@ async def radio_player():
 
             elapsed_time = asyncio.get_event_loop().time() - start_time
 
-            if elapsed_time >= ten_percent_duration or not _radio_ref.is_seeking:
+            if elapsed_time >= ten_percent_duration:
                 _db_ref.update_last_played(song["path"])
-                print(f"✓ Last played updated for: {song['path']}")
+                print(f"✓ Play count updated for: {song['path']}")
 
             raw_source.cleanup()
 

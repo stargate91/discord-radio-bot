@@ -31,6 +31,20 @@ class StationSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         channel_id = int(self.values[0])
+        
+        restricted_channels = {
+            1442881688043524228: 1423540338374479914,
+            1455966091950952582: 1455966276982669332
+        }
+
+        if channel_id in restricted_channels:
+            required_role_id = restricted_channels[channel_id]
+            user_roles = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+            
+            if required_role_id not in user_roles:
+                await interaction.response.send_message(t("no_permission"), ephemeral=True)
+                return
+
         self.radio.dispatch(RadioAction.JOIN, channel_id, user=interaction.user)
         await interaction.response.send_message(t("syncing"), ephemeral=True)
 
@@ -137,21 +151,69 @@ class StopButton(discord.ui.Button):
         self.radio.dispatch(RadioAction.STOP, user=interaction.user)
         await interaction.response.send_message(t("stopping"), ephemeral=True)
 
-class SkipButton(discord.ui.Button):
+class ForwardButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"⏭ {t('skip_label')}",
+            label=f"⏭ {t('forward_label')}",
             style=discord.ButtonStyle.secondary,
-            custom_id="skip_button"
+            custom_id="forward_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
+            self.radio.dispatch(RadioAction.FORWARD, user=interaction.user)
+            await interaction.response.send_message(t("forwarding"), ephemeral=True)
+        else:
+            await interaction.response.send_message(t("nothing_playing"), ephemeral=True)
+
+class RandomButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=f"🔀 {t('random_label')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="random_button"
         )
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
         if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
             self.radio.dispatch(RadioAction.SKIP, user=interaction.user)
-            await interaction.response.send_message(t("skipping"), ephemeral=True)
+            await interaction.response.send_message(t("randomizing"), ephemeral=True)
         else:
             await interaction.response.send_message(t("nothing_playing"), ephemeral=True)
+
+class BackButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        super().__init__(
+            label=f"⏮ {t('back_label')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="back_button"
+        )
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        import time
+        now = time.time()
+        if now - self.radio.last_back_time < 2.0:
+            await interaction.response.send_message(t("cooldown_error"), ephemeral=True)
+            return
+            
+        self.radio.last_back_time = now
+        
+        if self.radio.current_song:
+            current_path = self.radio.current_song.get("path")
+            if current_path not in self.radio.last_history_paths:
+                self.radio.last_history_paths.append(current_path)
+        
+        prev_song = self.db.get_previous_song(self.radio.last_history_paths)
+        
+        if prev_song:
+            self.radio.dispatch(RadioAction.BACK, prev_song, user=interaction.user)
+            await interaction.response.send_message(f"⏮ {t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
+        else:
+            await interaction.response.send_message(t("back_error"), ephemeral=True)
 
 class SeekButton(discord.ui.Button):
     def __init__(self, radio):

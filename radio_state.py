@@ -28,9 +28,14 @@ class RadioState:
         self.last_search_user: discord.User | None = None
         
         self.status = RadioStatusEnum.PLAYING
+        self.is_back_action: bool = False
+        self.is_forward_action: bool = False
         self.action_queue = asyncio.Queue()
         self.last_user: discord.Member | discord.User | None = None
         self.language: str = "en"
+        self.last_history_paths: list[str] = []
+        self.last_back_time: float = 0.0
+        self.forward_stack: list[dict] = []
 
     def refresh_queue(self):
         self.queue = []
@@ -49,3 +54,6 @@ class RadioState:
         if genre.lower() == "levifav":
             return self.db.get_random_song_by_rating(min_rating=5)
         return self.db.get_random_song_by_genre(genre)
+
+    def get_display_queue(self):
+        return list(reversed(self.forward_stack)) + self.queue

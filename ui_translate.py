@@ -34,9 +34,12 @@ LOCALES = {
         "resuming_feedback": "Resuming playback...",
         "pausing": "Pausing playback...",
         "stopping": "Stopping playback...",
-        "skipping": "Skipping the current track...",
+        "forwarding": "Moving to next track...",
+        "randomizing": "Generating new signal...",
         "nothing_playing": "Nothing is playing right now.",
         "cannot_seek_stopped": "Cannot seek while the radio is stopped",
+        "back_error": "No more history to go back to!",
+        "cooldown_error": "System stable, please wait a moment...",
         "jump_modal_title": "Jump to timestamp",
         "timestamp_input_label": "Enter timestamp (mm:ss)",
         "format_error": "Format must be mm:ss",
@@ -59,8 +62,10 @@ LOCALES = {
         "play_label": "Play",
         "pause_label": "Pause",
         "stop_label": "Stop",
-        "skip_label": "Skip",
+        "forward_label": "Forward",
+        "random_label": "Random",
         "seek_label": "Move To",
+        "back_label": "Back",
         "vol_label": "Vol",
         "like_label": "Like",
         "dislike_label": "Dislike",
@@ -86,7 +91,8 @@ LOCALES = {
         "queue_all": "Queue All",
         "last_label": "Last",
         "reset_radio_label": "Reset Radio",
-        "radio_reset_feedback": "Radio reset to random mode."
+        "radio_reset_feedback": "Radio reset to random mode.",
+        "no_permission": "You do not have the required role to access this channel."
     },
     "hu": {
         "system_sync": "💠 CSATLAKOZÁS",
@@ -122,10 +128,13 @@ LOCALES = {
         "cannot_pause_stopped": "Megállított zene nem szüneteltethető",
         "resuming_feedback": "Lejátszás folytatása...",
         "pausing": "Lejátszás szüneteltetése...",
-        "stopping": "Lejátszás megállítása...",
-        "skipping": "Jelenlegi szám átlépése...",
+        "stopping": "Lejátszás leállítása...",
+        "forwarding": "Ugrás a következő számra...",
+        "randomizing": "Új jel generálása...",
         "nothing_playing": "Jelenleg semmi sem szól.",
         "cannot_seek_stopped": "Megállított rádiónál nem lehet tekerni",
+        "back_error": "Nincs több előzmény a visszafelé léptetéshez!",
+        "cooldown_error": "Rendszer stabilizálása folyamatban, várjon egy pillanatot...",
         "jump_modal_title": "Ugrás időpontra",
         "timestamp_input_label": "Írja be az időpontot (pp:mp)",
         "format_error": "A formátum pp:mp kell legyen",
@@ -148,8 +157,10 @@ LOCALES = {
         "play_label": "Lejátszás",
         "pause_label": "Szünet",
         "stop_label": "Leállítás",
-        "skip_label": "Kihagyás",
+        "forward_label": "Előre",
+        "random_label": "Random",
         "seek_label": "Ugrás ide",
+        "back_label": "Vissza",
         "vol_label": "Hangerő",
         "like_label": "Tetszik",
         "dislike_label": "Nem tetszik",
@@ -175,7 +186,8 @@ LOCALES = {
         "queue_all": "Összes hozzáadása",
         "last_label": "Utolsó",
         "reset_radio_label": "Rádió alaphelyzet",
-        "radio_reset_feedback": "Rádió visszaállítva véletlenszerű módba."
+        "radio_reset_feedback": "Rádió visszaállítva véletlenszerű módba.",
+        "no_permission": "Nincs jogosultsága ehhez a csatornához a szükséges rang hiánya miatt."
     }
 }
 

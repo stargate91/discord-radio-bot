@@ -62,6 +62,17 @@ class DatabaseManager:
             )
             """)
 
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS playback_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                song_path TEXT NOT NULL,
+                user_id INTEGER,
+                timestamp INTEGER NOT NULL,
+                FOREIGN KEY(song_path) REFERENCES songs(path) ON DELETE CASCADE
+            )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON playback_history(timestamp)")
+
     def is_empty(self) -> bool:
 
         with self._connect() as conn:
@@ -128,9 +139,18 @@ class DatabaseManager:
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE songs
-                SET last_played = ?
+                SET last_played = ?, play_count = play_count + 1
                 WHERE path = ?
             """, (int(time.time()), song_path))
+            conn.commit()
+
+    def add_to_history(self, song_path: str, user_id: int | None = None):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO playback_history (song_path, user_id, timestamp)
+                VALUES (?, ?, ?)
+            """, (song_path, user_id, int(time.time())))
             conn.commit()
 
     def get_random_song_by_rating(self, min_rating: int = 5):
@@ -349,3 +369,28 @@ class DatabaseManager:
                 ORDER BY album ASC
             """, (artist,))
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_previous_song(self, exclude_paths: list[str] = []) -> dict | None:
+        import os
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            placeholders = ",".join(["?"] * len(exclude_paths)) if exclude_paths else "''"
+            query = f"""
+                SELECT DISTINCT s.path, s.* 
+                FROM playback_history h
+                JOIN songs s ON h.song_path = s.path
+                WHERE h.song_path NOT IN ({placeholders})
+                ORDER BY h.timestamp DESC
+                LIMIT 50
+            """
+            cursor.execute(query, tuple(exclude_paths))
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                song = dict(row)
+                if os.path.exists(song["path"]):
+                    return song
+                    
+            return None

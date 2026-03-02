@@ -6,7 +6,7 @@ from ui_utils import format_duration, fixed
 from radio_actions import RadioState as RadioStatusEnum, RadioAction
 from ui_components import (
     StationSelect, LanguageSelect, DisconnectButton, GenreSelect, 
-    PlayButton, PauseButton, StopButton, SkipButton, SeekButton, 
+    PlayButton, PauseButton, StopButton, ForwardButton, RandomButton, BackButton, SeekButton, 
     VolumeButton, LikeButton, DislikeButton, DetailsButton, 
     QueueToggleButton, SearchButton, AddSongButton, QueueAllButton,
     TabButton, SearchBySelectionButton
@@ -121,7 +121,8 @@ class NowPlayingView(discord.ui.LayoutView):
         if radio.show_queue:
             info_lines.append(f"\n**📋 {t('up_next')}**")
             q_list = []
-            for i, q_song in enumerate(radio.queue[:5], 1):
+            display_queue = radio.get_display_queue()
+            for i, q_song in enumerate(display_queue[:5], 1):
                 q_artist = fixed(q_song.get('artist', 'Unknown'), 22).strip()
                 q_title = fixed(q_song.get('title', 'Unknown'), 22).strip()
                 q_list.append(f"{i}. {q_artist} - {q_title}")
@@ -144,14 +145,16 @@ class NowPlayingView(discord.ui.LayoutView):
         master_container.add_item(genre_row)
 
         playback_row = ActionRow()
+        playback_row.add_item(BackButton(radio, db))
         playback_row.add_item(PlayButton(radio))
         playback_row.add_item(PauseButton(radio))
         playback_row.add_item(StopButton(radio))
-        playback_row.add_item(SkipButton(radio))
-        playback_row.add_item(SeekButton(radio))
+        playback_row.add_item(ForwardButton(radio))
         master_container.add_item(playback_row)
 
         meta_row_1 = ActionRow()
+        meta_row_1.add_item(RandomButton(radio))
+        meta_row_1.add_item(SeekButton(radio))
         meta_row_1.add_item(LikeButton(radio, db))
         meta_row_1.add_item(DislikeButton(radio, db))
         meta_row_1.add_item(SearchButton(radio, db))
