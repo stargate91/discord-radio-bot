@@ -394,3 +394,67 @@ class DatabaseManager:
                     return song
                     
             return None
+
+    def get_full_history(self, limit=10, offset=0, filter_from=None, filter_to=None) -> list[dict]:
+        from datetime import datetime
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            where_clauses = []
+            params = []
+            
+            if filter_from:
+                dt_from = datetime.strptime(filter_from.replace('.', '-'), '%Y-%m-%d')
+                where_clauses.append("h.timestamp >= ?")
+                params.append(dt_from.timestamp())
+            
+            if filter_to:
+                dt_to = datetime.strptime(filter_to.replace('.', '-'), '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                where_clauses.append("h.timestamp <= ?")
+                params.append(dt_to.timestamp())
+            
+            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+            
+            sql = f"""
+                SELECT s.*, h.timestamp as played_at
+                FROM playback_history h
+                JOIN songs s ON h.song_path = s.path
+                {where_sql}
+                ORDER BY h.timestamp DESC
+                LIMIT ? OFFSET ?
+            """
+            params.extend([limit, offset])
+            
+            cursor.execute(sql, tuple(params))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_history_count(self, filter_from=None, filter_to=None) -> int:
+        from datetime import datetime
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            
+            where_clauses = []
+            params = []
+            
+            if filter_from:
+                dt_from = datetime.strptime(filter_from.replace('.', '-'), '%Y-%m-%d')
+                where_clauses.append("timestamp >= ?")
+                params.append(dt_from.timestamp())
+            
+            if filter_to:
+                dt_to = datetime.strptime(filter_to.replace('.', '-'), '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                where_clauses.append("timestamp <= ?")
+                params.append(dt_to.timestamp())
+            
+            where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+            
+            sql = f"SELECT COUNT(*) FROM playback_history {where_sql}"
+            cursor.execute(sql, tuple(params))
+            return cursor.fetchone()[0]
+
+    def clear_history(self):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM playback_history")
+            conn.commit()

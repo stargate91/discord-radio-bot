@@ -26,6 +26,12 @@ class RadioState:
         self.last_search_query: str = None
         self.last_search_results: list[dict] = None
         self.last_search_user: discord.User | None = None
+        self.active_view_type: str = None
+        self.last_search_page: int = 0
+        self.last_search_type: str = "songs"
+        self.last_history_page: int = 0
+        self.filter_from: str = None
+        self.filter_to: str = None
         
         self.status = RadioStatusEnum.PLAYING
         self.is_back_action: bool = False

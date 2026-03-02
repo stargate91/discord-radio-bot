@@ -259,6 +259,7 @@ async def radio_player():
                             _radio_ref.is_seeking = False
                             _radio_ref.forward_stack = []
                             _radio_ref.last_history_paths = []
+                            _radio_ref.refresh_queue()
                             voice.stop()
                             break
                         elif action == RadioAction.SEEK:
@@ -305,14 +306,20 @@ async def radio_player():
                             _radio_ref.language = data
                             await _update_now_playing_fn(song)
                             search_id = _radio_ref.embed_manager.load_message_id("search")
-                            if search_id and _radio_ref.last_search_query:
-                                from ui_views import SearchResultsView
+                            if search_id:
+                                from ui_views import SearchResultsView, HistoryView
                                 channel = _bot_ref.get_channel(_config_ref.radio_text_channel_id)
                                 if channel:
                                     try:
                                         msg = await channel.fetch_message(search_id)
-                                        view = SearchResultsView(_radio_ref, _radio_ref.db, _radio_ref.last_search_results, _radio_ref.last_search_query, _radio_ref.last_search_user)
-                                        await msg.edit(view=view)
+                                        if _radio_ref.active_view_type == "history":
+                                            history = _radio_ref.db.get_full_history(limit=10, offset=_radio_ref.last_history_page * 10)
+                                            total_count = _radio_ref.db.get_history_count()
+                                            view = HistoryView(_radio_ref, _radio_ref.db, history, total_count, page=_radio_ref.last_history_page)
+                                            await msg.edit(view=view)
+                                        elif _radio_ref.active_view_type == "search" and _radio_ref.last_search_query:
+                                            view = SearchResultsView(_radio_ref, _radio_ref.db, _radio_ref.last_search_results, _radio_ref.last_search_query, _radio_ref.last_search_user, page=_radio_ref.last_search_page, search_type=_radio_ref.last_search_type)
+                                            await msg.edit(view=view)
                                     except: pass
                         elif action == RadioAction.DISCONNECT:
                             _radio_ref.voice_channel_id = None
@@ -352,7 +359,6 @@ async def radio_player():
                                     _radio_ref.last_history_paths.pop()
                             else:
                                 _radio_ref.is_forward_action = False
-                                # Normal skip logic is implicit by stopping voice without is_forward_action
                             
                             voice.stop()
                             break

@@ -8,7 +8,7 @@ from ui_components import (
     StationSelect, LanguageSelect, DisconnectButton, GenreSelect, 
     PlayButton, PauseButton, StopButton, ForwardButton, RandomButton, BackButton, SeekButton, 
     VolumeButton, LikeButton, DislikeButton, DetailsButton, 
-    QueueToggleButton, SearchButton, AddSongButton, QueueAllButton,
+    QueueToggleButton, SearchButton, HistoryButton, HistoryFilterButton, DeleteHistoryButton, AddSongButton, QueueAllButton,
     TabButton, SearchBySelectionButton
 )
 
@@ -115,8 +115,16 @@ class NowPlayingView(discord.ui.LayoutView):
             info_lines.append(f"\n**📂 {t('details_label')}**")
             info_lines.append(f"**{t('year')}:** {song.get('date', 'Unknown')}")
             info_lines.append(f"**{t('label')}:** {song.get('label', 'Unknown')}")
-            info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown')}")
+            info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown') or 'Unknown'}")
             info_lines.append(f"**{t('source')}:** {song.get('mediatype_flac') or song.get('mediatype_mp3') or 'Unknown'}")
+            info_lines.append(f"**{t('play_count_label')}:** {song.get('play_count', 0)}")
+            
+            last_played = song.get('last_played')
+            if last_played:
+                # Format: 2024-03-02 01:23:45 -> 2024.03.02 01:23
+                info_lines.append(f"**{t('last_played_label')}:** {str(last_played)[:16].replace('-', '.')}")
+            else:
+                info_lines.append(f"**{t('last_played_label')}:** ---")
 
         if radio.show_queue:
             info_lines.append(f"\n**📋 {t('up_next')}**")
@@ -164,6 +172,7 @@ class NowPlayingView(discord.ui.LayoutView):
         meta_row_2.add_item(VolumeButton(radio))
         meta_row_2.add_item(DetailsButton(radio))
         meta_row_2.add_item(QueueToggleButton(radio))
+        meta_row_2.add_item(HistoryButton(radio, db))
         master_container.add_item(meta_row_2)
 
         self.add_item(master_container)
@@ -259,22 +268,123 @@ class SearchResultsView(discord.ui.LayoutView):
         nav_row.add_item(last_btn)
 
         nav_row.add_item(QueueAllButton(radio, results))
-        
-        reset_btn = discord.ui.Button(label=t("reset_radio_label"), emoji="🔄", style=discord.ButtonStyle.secondary)
-        async def reset_callback(interaction):
-             await interaction.response.defer(ephemeral=True)
-             self.radio.queue = []
-             self.radio.dispatch(RadioAction.SKIP, user=interaction.user)
-             await interaction.followup.send(t("radio_reset_feedback"), ephemeral=True)
-        reset_btn.callback = reset_callback
-        nav_row.add_item(reset_btn)
 
         container.add_item(nav_row)
         self.add_item(container)
 
     async def update_view(self, interaction, use_followup=False):
+        self.radio.last_search_page = self.page
+        self.radio.last_search_type = self.search_type
         new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type, original_query=self.original_query)
         if use_followup:
             await interaction.edit_original_response(view=new_view)
         else:
             await interaction.response.edit_message(view=new_view)
+
+class HistoryView(LayoutView):
+    def __init__(self, radio, db, history, total_count, page=0):
+        super().__init__(timeout=None)
+        self.radio = radio
+        self.db = db
+        self.history = history
+        self.total_count = total_count
+        self.page = page
+        self.items_per_page = 10
+        self.total_pages = (total_count + self.items_per_page - 1) // self.items_per_page
+        self.update_view_all()
+
+    def update_view_all(self):
+        self.clear_items()
+        container = Container(accent_color=0x2b2d31)
+        
+        if not self.history:
+            container.add_item(TextDisplay(f"*{t('empty')}*"))
+        else:
+            from datetime import datetime
+            date_fmt = t("date_format")
+            for i, item in enumerate(self.history, (self.page * self.items_per_page) + 1):
+                timestamp = item.get('played_at', '')
+                try:
+                    # Handle Unix timestamp (int/float)
+                    if isinstance(timestamp, (int, float)):
+                        time_str = datetime.fromtimestamp(timestamp).strftime(date_fmt)
+                    else:
+                        # Handle string timestamp (YYYY-MM-DD HH:MM:SS)
+                        dt = datetime.fromisoformat(str(timestamp))
+                        time_str = dt.strftime(date_fmt)
+                except:
+                    time_str = str(timestamp)
+                
+                song_info = f"**{i}. {item['title']}** {item['artist']}\n*({t('played_at')} {time_str})*"
+                container.add_item(Section(song_info, accessory=AddSongButton(self.radio, item)))
+
+        container.add_item(Separator())
+        
+        nav_row = ActionRow()
+        prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+        async def prev_callback(interaction):
+            await interaction.response.defer()
+            self.page -= 1
+            await self.refresh_data(interaction)
+        prev_btn.callback = prev_callback
+        
+        next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        async def next_callback(interaction):
+            await interaction.response.defer()
+            self.page += 1
+            await self.refresh_data(interaction)
+        next_btn.callback = next_callback
+
+        last_btn = discord.ui.Button(label=t("last_label"), style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        async def last_callback(interaction):
+            await interaction.response.defer()
+            self.page = self.total_pages - 1
+            await self.refresh_data(interaction)
+        last_btn.callback = last_callback
+        
+        close_btn = discord.ui.Button(emoji="❌", style=discord.ButtonStyle.secondary)
+        async def close_callback(interaction):
+            await interaction.response.defer()
+            from ui import embed_state
+            embed_state.save_message_id("search", None)
+            self.radio.active_view_type = None
+            try:
+                await interaction.delete_original_response()
+            except:
+                try:
+                    await interaction.message.delete()
+                except:
+                    pass
+        close_btn.callback = close_callback
+
+        nav_row = ActionRow()
+        nav_row.add_item(prev_btn)
+        nav_row.add_item(next_btn)
+        nav_row.add_item(last_btn)
+        container.add_item(nav_row)
+
+        ctrl_row = ActionRow()
+        ctrl_row.add_item(HistoryFilterButton(self.radio, self.db))
+        ctrl_row.add_item(DeleteHistoryButton(self.radio, self.db))
+        ctrl_row.add_item(close_btn)
+        container.add_item(ctrl_row)
+        
+        # Add a filter badge if active
+        if self.radio.filter_from or self.radio.filter_to:
+            filter_text = f"📍 {t('filter_label')}: "
+            if self.radio.filter_from: filter_text += f"{t('filter_from_label').split(' ')[0]} {self.radio.filter_from} "
+            if self.radio.filter_to: filter_text += f"{t('filter_to_label').split(' ')[0]} {self.radio.filter_to}"
+            container.add_item(TextDisplay(f"*{filter_text}*"))
+        
+        self.add_item(container)
+
+    async def refresh_data(self, interaction):
+        self.radio.last_history_page = self.page
+        self.history = self.db.get_full_history(
+            limit=self.items_per_page, 
+            offset=self.page * self.items_per_page,
+            filter_from=self.radio.filter_from,
+            filter_to=self.radio.filter_to
+        )
+        self.update_view_all()
+        await interaction.edit_original_response(view=self)

@@ -422,6 +422,42 @@ class SearchButton(discord.ui.Button):
         modal = SearchModal(self.radio, self.db)
         await interaction.response.send_modal(modal)
 
+class HistoryButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        super().__init__(
+            label=f"📜 {t('history_label')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="history_button"
+        )
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        from ui_views import HistoryView
+        from ui import embed_state
+        
+        await interaction.response.defer()
+        
+        history = self.db.get_full_history(limit=10, offset=0)
+        total_count = self.db.get_history_count()
+        
+        self.radio.active_view_type = "history"
+        self.radio.last_history_page = 0
+        self.radio.filter_from = None
+        self.radio.filter_to = None
+        view = HistoryView(self.radio, self.db, history, total_count, page=0)
+        
+        search_id = embed_state.load_message_id("search")
+        if search_id:
+            try:
+                channel = interaction.channel
+                msg = await channel.fetch_message(search_id)
+                await msg.delete()
+            except: pass
+            
+        msg = await interaction.followup.send(view=view, ephemeral=False, wait=True)
+        embed_state.save_message_id("search", msg.id)
+
 class SearchModal(Modal):
     def __init__(self, radio, db):
         super().__init__(title=t("search_modal_title"))
@@ -462,6 +498,7 @@ class SearchModal(Modal):
         self.radio.last_search_results = results
         self.radio.last_search_user = interaction.user
 
+        self.radio.active_view_type = "search"
         view = SearchResultsView(self.radio, self.db, results, query, interaction.user)
         msg = await interaction.channel.send(view=view)
         embed_state.save_message_id("search", msg.id)
@@ -470,10 +507,13 @@ class SearchModal(Modal):
 
 class AddSongButton(discord.ui.Button):
     def __init__(self, radio, song):
+        import random
+        import string
+        unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
         super().__init__(
             emoji="➕",
             style=discord.ButtonStyle.secondary,
-            custom_id=f"add_song_{song['id']}"
+            custom_id=f"add_song_{song['id']}_{unique}"
         )
         self.radio = radio
         self.song = song
@@ -562,3 +602,110 @@ class QueueAllButton(discord.ui.Button):
             f"{t('queue_all')}: {len(self.songs)} {t('results')}",
             ephemeral=True
         )
+
+class HistoryFilterButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        label = t("filter_label")
+        emoji = "📅"
+        if radio.filter_from or radio.filter_to:
+            emoji = "🧹"
+            label = t("clear_filter_label")
+            
+        super().__init__(
+            label=f"{emoji} {label}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="history_filter_button"
+        )
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.radio.filter_from or self.radio.filter_to:
+            self.radio.filter_from = None
+            self.radio.filter_to = None
+            from ui_views import HistoryView
+            history = self.db.get_full_history(limit=10, offset=0)
+            total_count = self.db.get_history_count()
+            view = HistoryView(self.radio, self.db, history, total_count, page=0)
+            await interaction.response.edit_message(view=view)
+        else:
+            modal = HistoryFilterModal(self.radio, self.db)
+            await interaction.response.send_modal(modal)
+
+class HistoryFilterModal(discord.ui.Modal):
+    def __init__(self, radio, db):
+        super().__init__(title=t("filter_modal_title"))
+        self.radio = radio
+        self.db = db
+        
+        from datetime import datetime
+        now = datetime.now()
+        year_str = now.strftime("%Y.%m.%d")
+        
+        self.from_input = discord.ui.TextInput(
+            label=t("filter_from_label"),
+            placeholder=year_str,
+            style=discord.TextStyle.short,
+            required=False,
+            max_length=12
+        )
+        self.to_input = discord.ui.TextInput(
+            label=t("filter_to_label"),
+            placeholder=year_str,
+            style=discord.TextStyle.short,
+            required=False,
+            max_length=12
+        )
+        self.add_item(self.from_input)
+        self.add_item(self.to_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        from ui_views import HistoryView
+        from datetime import datetime
+        
+        def parse_date(ds):
+            if not ds: return None
+            clean = ds.strip().rstrip('.').replace('.', '-').replace(',', '-').replace('/', '-')
+            try:
+                return datetime.strptime(clean, '%Y-%m-%d').strftime('%Y.%m.%d')
+            except:
+                return None
+
+        f_from = parse_date(self.from_input.value)
+        f_to = parse_date(self.to_input.value)
+        
+        if (self.from_input.value and not f_from) or (self.to_input.value and not f_to):
+            await interaction.response.send_message(t("date_invalid_error"), ephemeral=True)
+            return
+
+        self.radio.filter_from = f_from
+        self.radio.filter_to = f_to
+        
+        await interaction.response.defer()
+        
+        history = self.db.get_full_history(limit=10, offset=0, filter_from=f_from, filter_to=f_to)
+        total_count = self.db.get_history_count(filter_from=f_from, filter_to=f_to)
+        
+        view = HistoryView(self.radio, self.db, history, total_count, page=0)
+        await interaction.edit_original_response(view=view)
+
+class DeleteHistoryButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        super().__init__(
+            label=t("delete_history_label"),
+            style=discord.ButtonStyle.danger,
+            emoji="🗑️",
+            custom_id="delete_history_button"
+        )
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        self.db.clear_history()
+        from ui_views import HistoryView
+        history = self.db.get_full_history(limit=10, offset=0)
+        total_count = self.db.get_history_count()
+        view = HistoryView(self.radio, self.db, history, total_count, page=0)
+        await interaction.edit_original_response(view=view)
+        await interaction.followup.send(t("history_cleared"), ephemeral=True)
