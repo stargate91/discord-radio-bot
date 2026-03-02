@@ -576,11 +576,34 @@ class AddSongButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        self.radio.dispatch(RadioAction.ADD_TO_QUEUE, self.song, user=interaction.user)
-        await interaction.followup.send(
-            f"{t('add_to_queue')} **{self.song['artist']} - {self.song['title']}**",
-            ephemeral=True
-        )
+        if self.radio.editing_playlist_id:
+            from database import DatabaseManager
+            db = DatabaseManager()
+            db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
+            await interaction.followup.send(
+                f"{t('song_added_to_playlist')} **{self.song['artist']} - {self.song['title']}**",
+                ephemeral=True
+            )
+            
+            search_id = self.radio.embed_manager.load_message_id("search")
+            if search_id:
+                try:
+                    from ui_views import PlaylistEditorView, SearchResultsView
+                    msg = await interaction.channel.fetch_message(search_id)
+                    if self.radio.active_view_type == "search":
+                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type)
+                        await msg.edit(view=view)
+                    elif self.radio.active_view_type in ["playlist_editor", "studio"]:
+                        view = PlaylistEditorView(self.radio, db, self.radio.editing_playlist_id, page=self.radio.last_editor_page)
+                        await msg.edit(view=view)
+                except Exception as e:
+                    print(f"DEBUG: Refresh failed: {e}")
+        else:
+            self.radio.dispatch(RadioAction.ADD_TO_QUEUE, self.song, user=interaction.user)
+            await interaction.followup.send(
+                f"{t('add_to_queue')} **{self.song['artist']} - {self.song['title']}**",
+                ephemeral=True
+            )
 
 class TabButton(discord.ui.Button):
     def __init__(self, radio, db, label, search_type, query, user, active=False):
@@ -652,12 +675,31 @@ class QueueAllButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        for song in self.songs:
-            self.radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
-        await interaction.followup.send(
-            f"{t('queue_all')}: {len(self.songs)} {t('results')}",
-            ephemeral=True
-        )
+        if self.radio.editing_playlist_id:
+            from database import DatabaseManager
+            db = DatabaseManager()
+            for song in self.songs:
+                db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
+            
+            await interaction.followup.send(
+                f"{t('song_added_to_playlist')} {len(self.songs)} {t('results')}",
+                ephemeral=True
+            )
+            
+            search_id = self.radio.embed_manager.load_message_id("search")
+            if search_id:
+                try:
+                    from ui_views import PlaylistEditorView
+                    msg = await interaction.channel.fetch_message(search_id)
+                    await msg.edit(view=PlaylistEditorView(self.radio, db, self.radio.editing_playlist_id, page=self.radio.last_editor_page))
+                except: pass
+        else:
+            for song in self.songs:
+                self.radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
+            await interaction.followup.send(
+                f"{t('queue_all')}: {len(self.songs)} {t('results')}",
+                ephemeral=True
+            )
 
 class HistoryFilterButton(discord.ui.Button):
     def __init__(self, radio, db):
@@ -765,3 +807,188 @@ class DeleteHistoryButton(discord.ui.Button):
         view = HistoryView(self.radio, self.db, history, total_count, page=0)
         await interaction.edit_original_response(view=view)
         await interaction.followup.send(t("history_cleared"), ephemeral=True)
+class PlaylistStudioButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=f"🛠️ {t('playlist_studio_label')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="playlist_studio_button"
+        )
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.radio.playlist_editor_user and self.radio.playlist_editor_user != interaction.user.id:
+            try:
+                member = await interaction.guild.fetch_member(self.radio.playlist_editor_user)
+                name = member.display_name
+            except:
+                name = "Someone"
+            await interaction.response.send_message(t("studio_locked_message").format(user=name), ephemeral=True)
+            return
+
+        await interaction.response.defer()
+        self.radio.playlist_editor_user = interaction.user.id
+        from database import DatabaseManager
+        from ui_views import PlaylistStudioView
+        from ui import embed_state
+        self.radio.active_view_type = "studio"
+        
+        db = DatabaseManager()
+        view = PlaylistStudioView(self.radio, db)
+        
+        # Cleanup existing search/studio message
+        old_id = embed_state.load_message_id("search")
+        if old_id:
+            try:
+                old_msg = await interaction.channel.fetch_message(old_id)
+                await old_msg.delete()
+            except: pass
+            embed_state.save_message_id("search", None)
+
+        msg = await interaction.followup.send(view=view, wait=True)
+        embed_state.save_message_id("search", msg.id)
+
+class PlaylistSelect(discord.ui.Select):
+    def __init__(self, radio, db, playlists):
+        self.radio = radio
+        self.db = db
+        options = [
+            discord.SelectOption(label=p['name'], value=str(p['id']), emoji="📝")
+            for p in playlists
+        ]
+        super().__init__(
+            placeholder=t("select_playlist_placeholder"),
+            options=options,
+            custom_id="playlist_select"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        playlist_id = int(self.values[0])
+        self.radio.editing_playlist_id = playlist_id
+        self.radio.last_editor_page = 0
+        from ui_views import PlaylistEditorView
+        await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, playlist_id))
+
+class NewPlaylistButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        super().__init__(label=t("new_playlist_label"), style=discord.ButtonStyle.primary, emoji="➕")
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(NewPlaylistModal(self.radio, self.db))
+
+class NewPlaylistModal(Modal):
+    def __init__(self, radio, db):
+        super().__init__(title=t("create_playlist_modal_title"))
+        self.radio = radio
+        self.db = db
+        self.name_input = TextInput(label=t("playlist_name_label"), required=True, min_length=1, max_length=50)
+        self.add_item(self.name_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        pid = self.db.create_playlist(self.name_input.value, interaction.user.id)
+        self.radio.editing_playlist_id = pid
+        self.radio.last_editor_page = 0
+        from ui_views import PlaylistEditorView
+        await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, pid))
+
+class RemoveFromPlaylistButton(discord.ui.Button):
+    def __init__(self, radio, db, playlist_id, song_path):
+        import random, string
+        unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+        super().__init__(emoji="🗑️", style=discord.ButtonStyle.secondary, custom_id=f"rem_pl_{unique}")
+        self.radio = radio
+        self.db = db
+        self.playlist_id = playlist_id
+        self.song_path = song_path
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.db.remove_song_from_playlist(self.playlist_id, self.song_path)
+        from ui_views import PlaylistEditorView
+        await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, self.playlist_id, page=self.radio.last_editor_page))
+
+class DeletePlaylistButton(discord.ui.Button):
+    def __init__(self, radio, db, playlist_id):
+        super().__init__(label=t("delete_playlist_label"), style=discord.ButtonStyle.danger, emoji="⚠️")
+        self.radio = radio
+        self.db = db
+        self.playlist_id = playlist_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        self.db.delete_playlist(self.playlist_id)
+        self.radio.editing_playlist_id = None
+        from ui_views import PlaylistStudioView
+        await interaction.edit_original_response(view=PlaylistStudioView(self.radio, self.db))
+        await interaction.followup.send(t("playlist_deleted"), ephemeral=True)
+
+class ExitStudioButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(label=t("save_exit_label"), style=discord.ButtonStyle.secondary, emoji="🚪")
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.radio.editing_playlist_id = None
+        self.radio.playlist_editor_user = None
+        from ui import embed_state
+        embed_state.save_message_id("search", None)
+        await interaction.delete_original_response()
+
+class RenamePlaylistButton(discord.ui.Button):
+    def __init__(self, radio, db, playlist_id):
+        super().__init__(label=t("rename_playlist_label") or "Rename", style=discord.ButtonStyle.secondary, emoji="✏️")
+        self.radio = radio
+        self.db = db
+        self.playlist_id = playlist_id
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(RenamePlaylistModal(self.radio, self.db, self.playlist_id))
+
+class RenamePlaylistModal(Modal):
+    def __init__(self, radio, db, playlist_id):
+        super().__init__(title=t("rename_playlist_modal_title") or "Rename Playlist")
+        self.radio = radio
+        self.db = db
+        self.playlist_id = playlist_id
+        self.name_input = TextInput(label=t("playlist_name_label"), required=True, min_length=1, max_length=50)
+        self.add_item(self.name_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.db.rename_playlist(self.playlist_id, self.name_input.value)
+        from ui_views import PlaylistEditorView
+        await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, self.playlist_id, page=self.radio.last_editor_page))
+
+class MoveSongInPlaylistButton(discord.ui.Button):
+    def __init__(self, radio, db, playlist_id, song_path, direction, emoji):
+        import random, string
+        unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+        super().__init__(emoji=emoji, style=discord.ButtonStyle.secondary, custom_id=f"move_{direction}_{unique}")
+        self.radio = radio
+        self.db = db
+        self.playlist_id = playlist_id
+        self.song_path = song_path
+        self.direction = direction
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.db.move_song_in_playlist(self.playlist_id, self.song_path, self.direction)
+        from ui_views import PlaylistEditorView
+        await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, self.playlist_id, page=self.radio.last_editor_page))
+
+class BackToEditorButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(label=t("back_label") or "Back", style=discord.ButtonStyle.secondary, emoji="🔙")
+        self.radio = radio
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        from ui_views import PlaylistEditorView
+        from database import DatabaseManager
+        db = DatabaseManager()
+        await interaction.edit_original_response(view=PlaylistEditorView(self.radio, db, self.radio.editing_playlist_id, page=self.radio.last_editor_page))

@@ -9,7 +9,7 @@ from ui_components import (
     PlayButton, PauseButton, StopButton, ForwardButton, RandomButton, ShuffleButton, BackButton, SeekButton, 
     VolumeButton, LikeButton, DislikeButton, DetailsButton, 
     QueueToggleButton, QueueViewButton, RemoveFromQueueButton, SearchButton, HistoryButton, HistoryFilterButton, DeleteHistoryButton, AddSongButton, QueueAllButton,
-    TabButton, SearchBySelectionButton
+    TabButton, SearchBySelectionButton, PlaylistStudioButton, RenamePlaylistButton, MoveSongInPlaylistButton, BackToEditorButton
 )
 
 _bot_ref = None
@@ -39,6 +39,10 @@ class UnifiedStandbyView(discord.ui.LayoutView):
             row_lang = ActionRow()
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
+            
+            row_studio = ActionRow()
+            row_studio.add_item(PlaylistStudioButton(radio))
+            station_container.add_item(row_studio)
         self.add_item(station_container)
 
         standby_container = Container(accent_color=0x2b2d31)
@@ -196,7 +200,13 @@ class SearchResultsView(discord.ui.LayoutView):
         self.language = radio.language
         self.items_per_page = 5
         self.total_pages = (len(results) - 1) // self.items_per_page + 1 if results else 1
+        
+        self.existing_paths = set()
+        if self.radio.editing_playlist_id:
+            playlist_songs = self.db.get_playlist_songs(self.radio.editing_playlist_id)
+            self.existing_paths = {s['path'] for s in playlist_songs}
 
+        self.radio.active_view_type = "search"
         print(f"[SEARCH VIEW] Initializing. Radio lang: {self.radio.language}, Translation test ('songs_tab'): {t('songs_tab')}")
 
         container = Container(accent_color=0x2b2d31)
@@ -218,18 +228,30 @@ class SearchResultsView(discord.ui.LayoutView):
         container.add_item(tab_row)
         container.add_item(Separator())
 
-        if not self.results:
+        if self.radio.editing_playlist_id:
+            playlists = self.db.get_all_playlists()
+            playlist_name = next((p['name'] for p in playlists if p['id'] == self.radio.editing_playlist_id), "...")
+            song_count = len(self.existing_paths)
+            container.add_item(TextDisplay(f"📌 **{playlist_name}** ({song_count} {t('songs')})"))
+            container.add_item(Separator())
+
+        start = self.page * self.items_per_page
+        end = start + self.items_per_page
+        page_results = self.results[start:end]
+
+        if not page_results:
             container.add_item(TextDisplay(f"*{t('search_no_results')}*"))
         else:
-            start = self.page * self.items_per_page
-            end = start + self.items_per_page
-            page_results = self.results[start:end]
 
             for i, item in enumerate(page_results, start + 1):
                 if self.search_type == "songs":
+                    is_added = item['path'] in self.existing_paths
                     song_info = f"**{i}. {item['title']}** {item['artist']} • {format_duration(item['duration'])}"
-                    section = Section(song_info, accessory=AddSongButton(radio, item))
-                    container.add_item(section)
+                    btn = AddSongButton(radio, item)
+                    if is_added:
+                        btn.emoji = "✅"
+                        btn.style = discord.ButtonStyle.success
+                    container.add_item(Section(song_info, accessory=btn))
                 elif self.search_type == "artists":
                     container.add_item(TextDisplay(f"**{i}. {item}**"))
                     row = ActionRow()
@@ -273,6 +295,10 @@ class SearchResultsView(discord.ui.LayoutView):
         nav_row.add_item(last_btn)
 
         nav_row.add_item(QueueAllButton(radio, results))
+        
+        if self.radio.editing_playlist_id:
+            from ui_components import BackToEditorButton
+            nav_row.add_item(BackToEditorButton(radio))
 
         container.add_item(nav_row)
         self.add_item(container)
@@ -458,3 +484,100 @@ class FullQueueView(discord.ui.LayoutView):
             
         new_view = FullQueueView(self.radio, page=self.page)
         await interaction.edit_original_response(view=new_view)
+class PlaylistStudioView(discord.ui.LayoutView):
+    def __init__(self, radio, db):
+        super().__init__(timeout=None)
+        self.radio = radio
+        self.db = db
+        
+        container = Container(accent_color=0x2b2d31)
+        container.add_item(TextDisplay(f"## {t('playlist_studio_title')}\n{t('playlist_studio_subtitle')}"))
+        
+        playlists = db.get_all_playlists()
+        if playlists:
+            row_select = ActionRow()
+            from ui_components import PlaylistSelect
+            row_select.add_item(PlaylistSelect(radio, db, playlists))
+            container.add_item(row_select)
+            
+        row_btns = ActionRow()
+        from ui_components import NewPlaylistButton, ExitStudioButton
+        row_btns.add_item(NewPlaylistButton(radio, db))
+        row_btns.add_item(ExitStudioButton(radio))
+        container.add_item(row_btns)
+        
+        self.add_item(container)
+
+class PlaylistEditorView(discord.ui.LayoutView):
+    def __init__(self, radio, db, playlist_id, page=0):
+        super().__init__(timeout=None)
+        self.radio = radio
+        self.db = db
+        self.playlist_id = playlist_id
+        self.page = page
+        self.items_per_page = 5
+        self.radio.active_view_type = "playlist_editor"
+        
+        songs = db.get_playlist_songs(playlist_id)
+        total_pages = (len(songs) - 1) // self.items_per_page + 1 if songs else 1
+        total_duration = sum(s.get('duration', 0) for s in songs)
+        
+        from ui_utils import format_duration
+        duration_str = format_duration(total_duration)
+        
+        container = Container(accent_color=0x5865F2)
+        playlists = db.get_all_playlists()
+        playlist_name = next((p['name'] for p in playlists if p['id'] == playlist_id), "Unknown")
+        
+        container.add_item(TextDisplay(f"## {t('playlist_editor_title')}: {playlist_name}"))
+        
+        if not songs:
+            container.add_item(TextDisplay(f"*{t('empty')}*"))
+        else:
+            start = page * self.items_per_page
+            end = start + self.items_per_page
+            page_songs = songs[start:end]
+            for i, song in enumerate(page_songs, start + 1):
+                from ui_components import RemoveFromPlaylistButton, MoveSongInPlaylistButton
+                info = f"**{i}. {song['artist']} - {song['title']}**"
+                
+                controls = ActionRow()
+                controls.add_item(MoveSongInPlaylistButton(radio, db, playlist_id, song['path'], -1, "⬆️"))
+                controls.add_item(MoveSongInPlaylistButton(radio, db, playlist_id, song['path'], 1, "⬇️"))
+                controls.add_item(RemoveFromPlaylistButton(radio, db, playlist_id, song['path']))
+                
+                container.add_item(TextDisplay(info))
+                container.add_item(controls)
+        
+        container.add_item(Separator())
+        footer = f"{t('page')} {page + 1}/{total_pages} • {len(songs)} {t('songs')} • {duration_str}"
+        container.add_item(TextDisplay(footer))
+        
+        nav_row = ActionRow()
+        prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(page == 0))
+        async def prev_callback(interaction):
+            await interaction.response.defer()
+            self.radio.last_editor_page -= 1
+            await interaction.edit_original_response(view=PlaylistEditorView(radio, db, playlist_id, page=self.radio.last_editor_page))
+        prev_btn.callback = prev_callback
+        
+        next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(page >= total_pages - 1))
+        async def next_callback(interaction):
+            await interaction.response.defer()
+            self.radio.last_editor_page += 1
+            await interaction.edit_original_response(view=PlaylistEditorView(radio, db, playlist_id, page=self.radio.last_editor_page))
+        next_btn.callback = next_callback
+        
+        nav_row.add_item(prev_btn)
+        nav_row.add_item(next_btn)
+        
+        ctrl_row = ActionRow()
+        from ui_components import SearchButton, DeletePlaylistButton, ExitStudioButton, RenamePlaylistButton
+        ctrl_row.add_item(SearchButton(radio, db))
+        ctrl_row.add_item(RenamePlaylistButton(radio, db, playlist_id))
+        ctrl_row.add_item(DeletePlaylistButton(radio, db, playlist_id))
+        ctrl_row.add_item(ExitStudioButton(radio))
+        
+        container.add_item(nav_row)
+        container.add_item(ctrl_row)
+        self.add_item(container)

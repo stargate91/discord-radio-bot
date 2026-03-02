@@ -7,14 +7,16 @@ _config_ref = None
 _radio_ref = None
 _db_ref = None
 _update_now_playing_fn = None
+_refresh_ui_fn = None
 
-def init_player(bot, config, radio, db, update_fn):
-    global _bot_ref, _config_ref, _radio_ref, _db_ref, _update_now_playing_fn
+def init_player(bot, config, radio, db, update_fn, refresh_fn):
+    global _bot_ref, _config_ref, _radio_ref, _db_ref, _update_now_playing_fn, _refresh_ui_fn
     _bot_ref = bot
     _config_ref = config
     _radio_ref = radio
     _db_ref = db
     _update_now_playing_fn = update_fn
+    _refresh_ui_fn = refresh_fn
 
 async def ensure_voice():
     if not _radio_ref.voice_channel_id:
@@ -50,19 +52,7 @@ async def radio_player():
                     await _update_now_playing_fn(_radio_ref.current_song or {})
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
-                    await _update_now_playing_fn(_radio_ref.current_song or {})
-                    
-                    search_id = _radio_ref.embed_manager.load_message_id("search")
-                    if search_id and _radio_ref.last_search_query:
-                        from ui_views import SearchResultsView
-                        channel = _bot_ref.get_channel(_config_ref.radio_text_channel_id)
-                        if channel:
-                            try:
-                                msg = await channel.fetch_message(search_id)
-                                view = SearchResultsView(_radio_ref, _radio_ref.db, _radio_ref.last_search_results, _radio_ref.last_search_query, _radio_ref.last_search_user)
-                                await msg.edit(view=view)
-                            except: pass
-                    
+                    await _refresh_ui_fn()
                     print(f"DEBUG: Language changed to: {data}")
                 continue
 
@@ -87,18 +77,7 @@ async def radio_player():
                     continue
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
-                    await _update_now_playing_fn(_radio_ref.current_song or {})
-                    
-                    search_id = _radio_ref.embed_manager.load_message_id("search")
-                    if search_id and _radio_ref.last_search_query:
-                        from ui_views import SearchResultsView
-                        channel = _bot_ref.get_channel(_config_ref.radio_text_channel_id)
-                        if channel:
-                            try:
-                                msg = await channel.fetch_message(search_id)
-                                view = SearchResultsView(_radio_ref, _radio_ref.db, _radio_ref.last_search_results, _radio_ref.last_search_query, _radio_ref.last_search_user)
-                                await msg.edit(view=view)
-                            except: pass
+                    await _refresh_ui_fn()
                     continue
                 else:
                     continue
@@ -132,27 +111,7 @@ async def radio_player():
                     print(f"[ACTION HANDLED] DISCONNECT: Voice client disconnected")
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
-                    await _update_now_playing_fn(_radio_ref.current_song or {})
-                    
-                    search_id = _radio_ref.embed_manager.load_message_id("search")
-                    if search_id and _radio_ref.last_search_query:
-                        from ui_views import SearchResultsView
-                        channel = _bot_ref.get_channel(_config_ref.radio_text_channel_id)
-                        if channel:
-                            try:
-                                msg = await channel.fetch_message(search_id)
-                                view = SearchResultsView(
-                                    _radio_ref, 
-                                    _radio_ref.db, 
-                                    _radio_ref.last_search_results, 
-                                    _radio_ref.last_search_query, 
-                                    _radio_ref.last_search_user
-                                )
-                                await msg.edit(view=view)
-                                print(f"[UI] Search results refreshed with language: {data}")
-                            except Exception as e:
-                                print(f"[UI] Failed to refresh search message: {e}")
-                    
+                    await _refresh_ui_fn()
                     print(f"[ACTION HANDLED] SET_LANGUAGE: Language set to {data}")
                 elif action == RadioAction.ADD_TO_QUEUE:
                     _radio_ref.queue.insert(0, data)
@@ -304,27 +263,7 @@ async def radio_player():
                             await _update_now_playing_fn(song)
                         elif action == RadioAction.SET_LANGUAGE:
                             _radio_ref.language = data
-                            await _update_now_playing_fn(song)
-                            search_id = _radio_ref.embed_manager.load_message_id("search")
-                            if search_id:
-                                from ui_views import SearchResultsView, HistoryView
-                                channel = _bot_ref.get_channel(_config_ref.radio_text_channel_id)
-                                if channel:
-                                    try:
-                                        msg = await channel.fetch_message(search_id)
-                                        if _radio_ref.active_view_type == "history":
-                                            history = _radio_ref.db.get_full_history(limit=10, offset=_radio_ref.last_history_page * 10)
-                                            total_count = _radio_ref.db.get_history_count()
-                                            view = HistoryView(_radio_ref, _radio_ref.db, history, total_count, page=_radio_ref.last_history_page)
-                                            await msg.edit(view=view)
-                                        elif _radio_ref.active_view_type == "queue":
-                                            from ui_views import FullQueueView
-                                            view = FullQueueView(_radio_ref, page=_radio_ref.last_queue_page)
-                                            await msg.edit(view=view)
-                                        elif _radio_ref.active_view_type == "search" and _radio_ref.last_search_query:
-                                            view = SearchResultsView(_radio_ref, _radio_ref.db, _radio_ref.last_search_results, _radio_ref.last_search_query, _radio_ref.last_search_user, page=_radio_ref.last_search_page, search_type=_radio_ref.last_search_type)
-                                            await msg.edit(view=view)
-                                    except: pass
+                            await _refresh_ui_fn()
                         elif action == RadioAction.DISCONNECT:
                             _radio_ref.voice_channel_id = None
                             _radio_ref.embed_manager.save_value("voice_channel_id", None)

@@ -63,11 +63,20 @@ class DatabaseManager:
             """)
 
             cursor.execute("""
-            CREATE TABLE IF NOT EXISTS playback_history (
+            CREATE TABLE IF NOT EXISTS playlists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                song_path TEXT NOT NULL,
+                name TEXT NOT NULL,
                 user_id INTEGER,
-                timestamp INTEGER NOT NULL,
+                created_at INTEGER NOT NULL
+            )
+            """)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS playlist_songs (
+                playlist_id INTEGER,
+                song_path TEXT,
+                position INTEGER,
+                PRIMARY KEY (playlist_id, song_path),
+                FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
                 FOREIGN KEY(song_path) REFERENCES songs(path) ON DELETE CASCADE
             )
             """)
@@ -457,4 +466,82 @@ class DatabaseManager:
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM playback_history")
+            conn.commit()
+
+    def create_playlist(self, name: str, user_id: int) -> int:
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO playlists (name, user_id, created_at) VALUES (?, ?, ?)",
+                (name, user_id, int(time.time()))
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_all_playlists(self) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM playlists ORDER BY name ASC")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_playlist_songs(self, playlist_id: int) -> list[dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT s.*, ps.position 
+                FROM playlist_songs ps
+                JOIN songs s ON ps.song_path = s.path
+                WHERE ps.playlist_id = ?
+                ORDER BY ps.position ASC
+            """, (playlist_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def add_song_to_playlist(self, playlist_id: int, song_path: str):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT MAX(position) FROM playlist_songs WHERE playlist_id = ?", (playlist_id,))
+            max_pos = cursor.fetchone()[0] or 0
+            cursor.execute(
+                "INSERT OR IGNORE INTO playlist_songs (playlist_id, song_path, position) VALUES (?, ?, ?)",
+                (playlist_id, song_path, max_pos + 1)
+            )
+            conn.commit()
+
+    def remove_song_from_playlist(self, playlist_id: int, song_path: str):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM playlist_songs WHERE playlist_id = ? AND song_path = ?", (playlist_id, song_path))
+            conn.commit()
+
+    def delete_playlist(self, playlist_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM playlists WHERE id = ?", (playlist_id,))
+            cursor.execute("DELETE FROM playlist_songs WHERE playlist_id = ?", (playlist_id,))
+            conn.commit()
+
+    def rename_playlist(self, playlist_id: int, new_name: str):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE playlists SET name = ? WHERE id = ?", (new_name, playlist_id))
+            conn.commit()
+
+    def move_song_in_playlist(self, playlist_id: int, song_path: str, direction: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT position FROM playlist_songs WHERE playlist_id = ? AND song_path = ?", (playlist_id, song_path))
+            row = cursor.fetchone()
+            if not row: return
+            curr_pos = row[0]
+            new_pos = curr_pos + direction
+            if new_pos < 1: return
+
+            cursor.execute("SELECT song_path FROM playlist_songs WHERE playlist_id = ? AND position = ?", (playlist_id, new_pos))
+            other = cursor.fetchone()
+            if other:
+                cursor.execute("UPDATE playlist_songs SET position = ? WHERE playlist_id = ? AND song_path = ?", (curr_pos, playlist_id, other[0]))
+            
+            cursor.execute("UPDATE playlist_songs SET position = ? WHERE playlist_id = ? AND song_path = ?", (new_pos, playlist_id, song_path))
             conn.commit()

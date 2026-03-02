@@ -42,6 +42,10 @@ class RadioState:
         self.last_history_paths: list[str] = []
         self.last_back_time: float = 0.0
         self.forward_stack: list[dict] = []
+        
+        self.editing_playlist_id: int | None = None
+        self.playlist_editor_user: int | None = None
+        self.last_editor_page: int = 0
 
     def refresh_queue(self):
         self.queue = []

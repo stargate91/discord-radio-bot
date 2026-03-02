@@ -1,7 +1,7 @@
 from config_loader import load_config
 from database import DatabaseManager
 from scanner import scan_music_library
-from ui import update_now_playing, force_new_embed, UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_ui
+from ui import update_now_playing, force_new_embed, refresh_all_uis, UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_ui
 from radio_state import RadioState
 from player_engine import radio_player, init_player
 import asyncio
@@ -24,7 +24,7 @@ bot = discord.Client(intents=intents)
 radio = RadioState(config, db)
 
 init_ui(bot, config, radio, db)
-init_player(bot, config, radio, db, update_now_playing)
+init_player(bot, config, radio, db, update_now_playing, refresh_all_uis)
 
 async def embed_refresh_loop():
     await bot.wait_until_ready()

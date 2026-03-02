@@ -26,6 +26,8 @@ LOCALES = {
         "played_at": "Played at",
         "date_format": "%Y-%m-%d %H:%M",
         "filter_label": "Filter",
+        "import_genre_modal_title": "Import Songs from Genre",
+        "studio_locked_message": "The Playlist Studio is currently being used by {user}. Please wait until they finish.",
         "filter_modal_title": "Filter by date",
         "filter_from_label": "From (YYYY.MM.DD)",
         "filter_to_label": "To (YYYY.MM.DD)",
@@ -112,7 +114,22 @@ LOCALES = {
         "last_label": "Last",
         "reset_radio_label": "Reset Radio",
         "radio_reset_feedback": "Radio reset to random mode.",
-        "no_permission": "You do not have the required role to access this channel."
+        "no_permission": "You do not have the required role to access this channel.",
+        "playlist_studio_label": "Playlist Studio",
+        "playlist_studio_title": "🔧 PLAYLIST STUDIO",
+        "playlist_studio_subtitle": "Create and manage your custom playlists.",
+        "new_playlist_label": "New Playlist",
+        "delete_playlist_label": "Delete Playlist",
+        "select_playlist_placeholder": "Select Playlist to Edit",
+        "playlist_editor_title": "📝 EDITING PLAYLIST",
+        "save_exit_label": "Save & Exit",
+        "create_playlist_modal_title": "Create New Playlist",
+        "playlist_name_label": "Playlist Name",
+        "song_added_to_playlist": "Added to playlist:",
+        "song_removed_from_playlist": "Removed from playlist:",
+        "playlist_deleted": "Playlist deleted.",
+        "rename_playlist_label": "Rename",
+        "rename_playlist_modal_title": "Rename Playlist"
     },
     "hu": {
         "system_sync": "💠 CSATLAKOZÁS",
@@ -227,7 +244,23 @@ LOCALES = {
         "last_label": "Utolsó",
         "reset_radio_label": "Rádió alaphelyzet",
         "radio_reset_feedback": "Rádió visszaállítva véletlenszerű módba.",
-        "no_permission": "Nincs jogosultsága ehhez a csatornához a szükséges rang hiánya miatt."
+        "no_permission": "Nincs jogosultsága ehhez a csatornához a szükséges rang hiánya miatt.",
+        "playlist_studio_label": "Playlist Stúdió",
+        "playlist_studio_title": "🔧 PLAYLIST STÚDIÓ",
+        "playlist_studio_subtitle": "Saját lejátszási listák kezelése és létrehozása.",
+        "new_playlist_label": "Új lista",
+        "delete_playlist_label": "Lista törlése",
+        "select_playlist_placeholder": "Lista kiválasztása szerkesztésre",
+        "playlist_editor_title": "📝 LISTA SZERKESZTÉSE",
+        "save_exit_label": "Mentés és kilépés",
+        "create_playlist_modal_title": "Új lejátszási lista létrehozása",
+        "playlist_name_label": "Lista neve",
+        "song_added_to_playlist": "Hozzáadva a listához:",
+        "song_removed_from_playlist": "Eltávolítva a listáról:",
+        "playlist_deleted": "Lejátszási lista törölve.",
+        "rename_playlist_label": "Átnevezés",
+        "import_genre_modal_title": "Dalok importálása műfajból",
+        "studio_locked_message": "A Playlist Stúdiót jelenleg {user} használja. Kérlek várd meg, amíg befejezi."
     }
 }
 
