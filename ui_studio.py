@@ -174,11 +174,18 @@ class ExitStudioButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer()
-        self.radio.editing_playlist_id = None
-        self.radio.playlist_editor_user = None
-        from ui import embed_state
-        embed_state.save_message_id("search", None)
-        await interaction.delete_original_response()
+        
+        if self.radio.editing_playlist_id:
+            self.radio.editing_playlist_id = None
+            from database import DatabaseManager
+            db = DatabaseManager()
+            await interaction.edit_original_response(view=PlaylistStudioView(self.radio, db))
+        else:
+            self.radio.playlist_editor_user = None
+            self.radio.active_view_type = None
+            from ui import embed_state
+            embed_state.save_message_id("search", None)
+            await interaction.delete_original_response()
 
 class RenamePlaylistButton(discord.ui.Button):
     def __init__(self, radio, db, playlist_id):
@@ -335,6 +342,7 @@ class PlaylistStudioView(LayoutView):
         super().__init__(timeout=None)
         self.radio = radio
         self.db = db
+        self.radio.active_view_type = "studio"
         container = Container(accent_color=Theme.BACKGROUND)
         container.add_item(TextDisplay(f"**{t('playlist_studio_title')}**\n{t('playlist_studio_subtitle')}"))
         playlists = db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
@@ -365,6 +373,16 @@ class PlaylistEditorView(LayoutView):
         playlists = db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
         playlist_name = next((p['name'] for p in playlists if p['id'] == playlist_id), "Unknown")
         container.add_item(TextDisplay(f"**{t('playlist_editor_title')}: {playlist_name}**"))
+        
+        ctrl_row = ActionRow()
+        from ui_search import SearchButton
+        ctrl_row.add_item(SearchButton(radio, db))
+        ctrl_row.add_item(RenamePlaylistButton(radio, db, playlist_id))
+        ctrl_row.add_item(DeletePlaylistButton(radio, db, playlist_id))
+        ctrl_row.add_item(ExitStudioButton(radio))
+        container.add_item(ctrl_row)
+        container.add_item(Separator())
+
         if not songs:
             container.add_item(TextDisplay(f"*{t('empty')}*"))
         else:
@@ -399,14 +417,7 @@ class PlaylistEditorView(LayoutView):
         next_btn.callback = next_callback
         nav_row.add_item(prev_btn)
         nav_row.add_item(next_btn)
-        ctrl_row = ActionRow()
-        from ui_search import SearchButton
-        ctrl_row.add_item(SearchButton(radio, db))
-        ctrl_row.add_item(RenamePlaylistButton(radio, db, playlist_id))
-        ctrl_row.add_item(DeletePlaylistButton(radio, db, playlist_id))
-        ctrl_row.add_item(ExitStudioButton(radio))
         container.add_item(nav_row)
-        container.add_item(ctrl_row)
         self.add_item(container)
 
 class HistoryView(LayoutView):

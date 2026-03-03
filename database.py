@@ -80,6 +80,15 @@ class DatabaseManager:
                 FOREIGN KEY(song_path) REFERENCES songs(path) ON DELETE CASCADE
             )
             """)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS playback_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                song_path TEXT NOT NULL,
+                user_id INTEGER,
+                timestamp INTEGER NOT NULL,
+                FOREIGN KEY(song_path) REFERENCES songs(path) ON DELETE CASCADE
+            )
+            """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON playback_history(timestamp)")
 
     def is_empty(self) -> bool:
