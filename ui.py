@@ -3,7 +3,6 @@ from pathlib import Path
 from embed_state import EmbedStateManager
 from scanner import find_and_save_cover
 from ui_translate import t, init_translate
-from ui_utils import format_duration, fixed
 from ui_player import UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_player_ui
 from ui_search import SearchResultsView, FullQueueView
 from ui_studio import PlaylistStudioView, PlaylistEditorView, HistoryView
@@ -135,8 +134,6 @@ async def force_new_embed():
 
     radio.now_playing_message = None
     radio.station_message = None
-    radio.queue_message = None
-    radio.details_message = None
     
     radio.editing_playlist_id = None
     radio.playlist_editor_user = None

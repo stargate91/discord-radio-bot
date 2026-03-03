@@ -203,15 +203,6 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
 
-    def get_song_by_id(self, song_id: int):
-        with self._connect() as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT * FROM songs WHERE id = ?", (song_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
-
     def toggle_rating(self, user_id: int, song_path: str, rating_type: str):
         with self._connect() as conn:
             cursor = conn.cursor()

@@ -18,11 +18,9 @@ class RadioState:
         self.volume: float = 0.5
         self.now_playing_message: discord.Message | None = None
         self.station_message: discord.Message | None = None
-        self.queue_message: discord.Message | None = None
         self.queue: list[dict] = []
         self.show_queue: bool = False
         self.show_details: bool = False
-        self.details_message: discord.Message | None = None
         self.last_search_query: str = None
         self.last_search_results: list[dict] = None
         self.last_search_user: discord.User | None = None

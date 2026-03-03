@@ -92,9 +92,9 @@ class GenreSelect(discord.ui.Select):
         genres = db.get_all_genres()
         if "levifav" not in genres:
             genres.append("levifav")
-        options = [discord.SelectOption(label=g.upper(), value=g) for g in genres]
+        options = [discord.SelectOption(label=g.upper(), value=g, emoji=Icons.GENRE) for g in genres]
         super().__init__(
-            placeholder=f"{Icons.GENRE} {t('placeholder_genre')}",
+            placeholder=t('placeholder_genre'),
             min_values=1,
             max_values=1,
             options=options,
@@ -109,7 +109,8 @@ class GenreSelect(discord.ui.Select):
 class PlayButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.PLAY} {t('play_label') or 'Play'}",
+            label=t('play_label') or 'Play',
+            emoji=Icons.PLAY,
             style=discord.ButtonStyle.secondary,
             custom_id="play_button"
         )
@@ -122,7 +123,8 @@ class PlayButton(discord.ui.Button):
 class PauseButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.PAUSE} {t('pause_label')}",
+            label=t('pause_label'),
+            emoji=Icons.PAUSE,
             style=discord.ButtonStyle.secondary,
             custom_id="pause_button"
         )
@@ -143,7 +145,8 @@ class PauseButton(discord.ui.Button):
 class StopButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.STOP} {t('stop_label')}",
+            label=t('stop_label'),
+            emoji=Icons.STOP,
             style=discord.ButtonStyle.secondary,
             custom_id="stop_button"
         )
@@ -156,7 +159,8 @@ class StopButton(discord.ui.Button):
 class ForwardButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.FORWARD} {t('forward_label')}",
+            label=t('forward_label'),
+            emoji=Icons.FORWARD,
             style=discord.ButtonStyle.secondary,
             custom_id="forward_button"
         )
@@ -172,7 +176,8 @@ class ForwardButton(discord.ui.Button):
 class RandomButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.RANDOM} {t('random_label')}",
+            label=t('random_label'),
+            emoji=Icons.RANDOM,
             style=discord.ButtonStyle.secondary,
             custom_id="random_button"
         )
@@ -188,7 +193,8 @@ class RandomButton(discord.ui.Button):
 class ShuffleButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.SHUFFLE} {t('shuffle_label')}",
+            label=t('shuffle_label'),
+            emoji=Icons.SHUFFLE,
             style=discord.ButtonStyle.secondary,
             custom_id="shuffle_button"
         )
@@ -201,7 +207,8 @@ class ShuffleButton(discord.ui.Button):
 class BackButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"{Icons.BACK_STEP} {t('back_label')}",
+            label=t('back_label'),
+            emoji=Icons.BACK_STEP,
             style=discord.ButtonStyle.secondary,
             custom_id="back_button"
         )
@@ -229,7 +236,8 @@ class BackButton(discord.ui.Button):
 class SeekButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.SEEK} {t('seek_label')}",
+            label=t('seek_label'),
+            emoji=Icons.SEEK,
             style=discord.ButtonStyle.secondary,
             custom_id="seek_button"
         )
@@ -275,7 +283,8 @@ class SeekModal(Modal):
 class VolumeButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.VOLUME} {t('vol_label')}",
+            label=t('vol_label'),
+            emoji=Icons.VOLUME,
             style=discord.ButtonStyle.secondary,
             custom_id="volume_button"
         )
@@ -313,7 +322,8 @@ class VolumeModal(Modal):
 class LikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"{Icons.LIKE} {t('like_label')}",
+            label=t('like_label'),
+            emoji=Icons.LIKE,
             style=discord.ButtonStyle.secondary,
             custom_id="like_button"
         )
@@ -346,7 +356,8 @@ class LikeButton(discord.ui.Button):
 class DislikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"{Icons.DISLIKE} {t('dislike_label')}",
+            label=t('dislike_label'),
+            emoji=Icons.DISLIKE,
             style=discord.ButtonStyle.secondary,
             custom_id="dislike_button"
         )
@@ -379,7 +390,8 @@ class DislikeButton(discord.ui.Button):
 class DetailsButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.INFO} {t('details_btn_label')}",
+            label=t('details_btn_label'),
+            emoji=Icons.INFO,
             style=discord.ButtonStyle.secondary,
             custom_id="details_button"
         )
@@ -397,7 +409,8 @@ class DetailsButton(discord.ui.Button):
 class QueueToggleButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.QUEUE} {t('queue_label')}",
+            label=t('queue_label'),
+            emoji=Icons.QUEUE,
             style=discord.ButtonStyle.secondary,
             custom_id="queue_toggle"
         )
@@ -418,7 +431,7 @@ class UnifiedStandbyView(LayoutView):
         self.radio = radio
 
         station_container = Container(accent_color=Theme.BACKGROUND)
-        station_container.add_item(TextDisplay(f"## {t('system_sync')}\n{t('synchro_subtitle')}"))
+        station_container.add_item(TextDisplay(f"**{t('system_sync')}**\n{t('synchro_subtitle')}"))
         
         guild = _bot_ref.get_guild(_config_ref.guild_id)
         if guild:
@@ -440,7 +453,7 @@ class UnifiedStandbyView(LayoutView):
         self.add_item(station_container)
 
         standby_container = Container(accent_color=Theme.BACKGROUND)
-        standby_container.add_item(TextDisplay(f"## {t('standby_mode')}\n{t('standby_subtitle')}"))
+        standby_container.add_item(TextDisplay(f"**{t('standby_mode')}**\n{t('standby_subtitle')}"))
         self.add_item(standby_container)
 
 class FrequencyStationView(LayoutView):
@@ -449,7 +462,7 @@ class FrequencyStationView(LayoutView):
         self.radio = radio
 
         station_container = Container(accent_color=Theme.BACKGROUND)
-        station_container.add_item(TextDisplay(f"## {t('system_sync')}\n{t('synchro_subtitle')}"))
+        station_container.add_item(TextDisplay(f"**{t('system_sync')}**\n{t('synchro_subtitle')}"))
         
         guild = _bot_ref.get_guild(_config_ref.guild_id)
         if guild:
@@ -504,7 +517,7 @@ class NowPlayingView(LayoutView):
         channel_mention = f"<#{radio.voice_channel_id}>"
 
         info_lines = [
-            f"## {status_title}",
+            f"**{status_title}**",
             f"**{t('artist')}:** {truncated_artist}",
             f"**{t('title')}:** {truncated_title}",
             f"**{t('album')}:** {truncated_album}",

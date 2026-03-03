@@ -39,8 +39,3 @@ class EmbedStateManager:
         except (json.JSONDecodeError, OSError):
             return {}
 
-    def clear(self):
-        try:
-            self.file_path.unlink()
-        except FileNotFoundError:
-            pass

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, APIC
-from mutagen.flac import FLAC, Picture
+from mutagen.flac import FLAC
 
 import hashlib
 

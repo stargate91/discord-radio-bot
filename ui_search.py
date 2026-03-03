@@ -1,10 +1,9 @@
 import discord
-from discord.ui import Modal, TextInput, LayoutView, ActionRow, Container, Section, TextDisplay, Thumbnail, Separator
-from pathlib import Path
+from discord.ui import Modal, TextInput, LayoutView, ActionRow, Container, Section, TextDisplay, Separator
 from ui_translate import t
 from ui_icons import Icons
 from ui_utils import fixed, format_duration
-from radio_actions import RadioAction, RadioState as RadioStatusEnum
+from radio_actions import RadioAction
 from ui_theme import Theme
 
 async def check_editor_lock(radio, interaction):
@@ -20,7 +19,8 @@ async def check_editor_lock(radio, interaction):
 class SearchButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"{Icons.SEARCH} {t('search_label')}",
+            label=t('search_label'),
+            emoji=Icons.SEARCH,
             style=discord.ButtonStyle.secondary,
             custom_id="search_button"
         )
@@ -211,7 +211,7 @@ class QueueAllButton(discord.ui.Button):
 
 class QueueViewButton(discord.ui.Button):
     def __init__(self, radio):
-        super().__init__(label=f"{Icons.QUEUE} {t('full_queue_label')}", style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
+        super().__init__(label=t('full_queue_label'), emoji=Icons.QUEUE, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):

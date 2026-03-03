@@ -1,10 +1,9 @@
 import discord
-from discord.ui import Modal, TextInput, LayoutView, ActionRow, Container, Section, TextDisplay, Thumbnail, Separator
-from pathlib import Path
+from discord.ui import Modal, TextInput, LayoutView, ActionRow, Container, Section, TextDisplay, Separator
 from ui_translate import t
 from ui_icons import Icons
 from ui_utils import fixed, format_duration
-from radio_actions import RadioAction, RadioState as RadioStatusEnum
+from radio_actions import RadioAction
 from ui_theme import Theme
 
 async def check_editor_lock(radio, interaction):
@@ -20,7 +19,8 @@ async def check_editor_lock(radio, interaction):
 class PlaylistViewButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"{Icons.PLAYLIST} {t('playlists_tab')}",
+            label=t('playlists_tab'),
+            emoji=Icons.PLAYLIST,
             style=discord.ButtonStyle.secondary,
             custom_id="playlist_view_button"
         )
@@ -236,7 +236,7 @@ class BackToEditorButton(discord.ui.Button):
 
 class HistoryButton(discord.ui.Button):
     def __init__(self, radio, db):
-        super().__init__(label=f"{Icons.HISTORY} {t('history_label')}", style=discord.ButtonStyle.secondary, custom_id="history_button")
+        super().__init__(label=t('history_label'), emoji=Icons.HISTORY, style=discord.ButtonStyle.secondary, custom_id="history_button")
         self.radio = radio
         self.db = db
 
@@ -266,7 +266,7 @@ class HistoryFilterButton(discord.ui.Button):
         if radio.filter_from or radio.filter_to:
             emoji = Icons.SWEEP
             label = t("clear_filter_label")
-        super().__init__(label=f"{emoji} {label}", style=discord.ButtonStyle.secondary, custom_id="history_filter_button")
+        super().__init__(label=label, emoji=emoji, style=discord.ButtonStyle.secondary, custom_id="history_filter_button")
         self.radio = radio
         self.db = db
 
@@ -336,7 +336,7 @@ class PlaylistStudioView(LayoutView):
         self.radio = radio
         self.db = db
         container = Container(accent_color=Theme.BACKGROUND)
-        container.add_item(TextDisplay(f"## {t('playlist_studio_title')}\n{t('playlist_studio_subtitle')}"))
+        container.add_item(TextDisplay(f"**{t('playlist_studio_title')}**\n{t('playlist_studio_subtitle')}"))
         playlists = db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
         if playlists:
             row_select = ActionRow()
@@ -364,7 +364,7 @@ class PlaylistEditorView(LayoutView):
         container = Container(accent_color=Theme.PRIMARY)
         playlists = db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
         playlist_name = next((p['name'] for p in playlists if p['id'] == playlist_id), "Unknown")
-        container.add_item(TextDisplay(f"## {t('playlist_editor_title')}: {playlist_name}"))
+        container.add_item(TextDisplay(f"**{t('playlist_editor_title')}: {playlist_name}**"))
         if not songs:
             container.add_item(TextDisplay(f"*{t('empty')}*"))
         else:
