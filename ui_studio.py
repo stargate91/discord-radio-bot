@@ -19,7 +19,7 @@ async def check_editor_lock(radio, interaction):
 class PlaylistViewButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=t('playlists_tab'),
+            label=None if radio.is_compact else t('playlists_tab'),
             emoji=Icons.PLAYLIST,
             style=discord.ButtonStyle.secondary,
             custom_id="playlist_view_button"
@@ -54,7 +54,7 @@ class PlaylistViewButton(discord.ui.Button):
 class PlaylistStudioButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t("playlist_studio_label"), 
+            label=None if radio.is_compact else t("playlist_studio_label"), 
             style=discord.ButtonStyle.secondary, 
             emoji=Icons.STUDIO,
             custom_id="playlist_studio_button"
@@ -243,7 +243,7 @@ class BackToEditorButton(discord.ui.Button):
 
 class HistoryButton(discord.ui.Button):
     def __init__(self, radio, db):
-        super().__init__(label=t('history_label'), emoji=Icons.HISTORY, style=discord.ButtonStyle.secondary, custom_id="history_button")
+        super().__init__(label=None if radio.is_compact else t('history_label'), emoji=Icons.HISTORY, style=discord.ButtonStyle.secondary, custom_id="history_button")
         self.radio = radio
         self.db = db
 

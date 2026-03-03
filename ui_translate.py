@@ -39,7 +39,7 @@ LOCALES = {
         "delete_history_confirm": "Are you sure you want to clear all history? This cannot be undone.",
         "history_cleared": "Playback history cleared.",
         "shuffle_label": "Shuffle",
-        "full_queue_label": "Full List",
+        "full_queue_label": "Full Queue",
         "remove_song_label": "Remove",
         "shuffle_feedback": "Queue shuffled!",
         "up_next": "Up Next",
@@ -49,6 +49,7 @@ LOCALES = {
         "placeholder_freq": "Select Channel",
         "placeholder_genre": "Select Genre",
         "placeholder_lang": "Language",
+        "placeholder_ui": "Select UI Style",
         "syncing": "Syncing with channel frequency...",
         "severing": "Severing synthetic connection. \"Part of me stay with you?\"",
         "switching_genre": "Genre switching to:",
@@ -87,9 +88,9 @@ LOCALES = {
         "stop_label": "Stop",
         "forward_label": "Forward",
         "random_label": "Random",
-        "seek_label": "Move To",
+        "seek_label": "Seek",
         "back_label": "Back",
-        "vol_label": "Vol",
+        "vol_label": "Volume",
         "like_label": "Like",
         "dislike_label": "Dislike",
         "details_btn_label": "Info",
@@ -135,7 +136,10 @@ LOCALES = {
         "song_removed_from_playlist": "Removed from playlist:",
         "playlist_deleted": "Playlist deleted.",
         "rename_playlist_label": "Rename",
-        "rename_playlist_modal_title": "Rename Playlist"
+        "rename_playlist_modal_title": "Rename Playlist",
+        "ui_mode_label": "Interface Style",
+        "ui_mode_full": "Full Interface (Icons + Labels)",
+        "ui_mode_compact": "Compact Interface (Icons only)"
     },
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
@@ -173,7 +177,7 @@ LOCALES = {
         "delete_history_confirm": "Biztosan törölni szeretnél minden előzményt? Ez nem vonható vissza.",
         "history_cleared": "Lejátszási előzmények törölve.",
         "shuffle_label": "Keverés",
-        "full_queue_label": "Teljes lista",
+        "full_queue_label": "Teljes várólista",
         "remove_song_label": "Eltávolítás",
         "shuffle_feedback": "Várólista megkeverve!",
         "up_next": "Következik",
@@ -183,6 +187,7 @@ LOCALES = {
         "placeholder_freq": "Csatorna kiválasztása",
         "placeholder_genre": "Stílus kiválasztása",
         "placeholder_lang": "Nyelvválasztás",
+        "placeholder_ui": "Kezelőfelület stílusa",
         "syncing": "Csatlakozás a csatorna frekvenciájához...",
         "severing": "A szintetikus kapcsolat megszakítva. \"Veled maradhat egy részem?\"",
         "switching_genre": "Stílusváltás folyamatban:",
@@ -221,7 +226,7 @@ LOCALES = {
         "stop_label": "Leállítás",
         "forward_label": "Előre",
         "random_label": "Random",
-        "seek_label": "Ugrás ide",
+        "seek_label": "Tekerés",
         "back_label": "Vissza",
         "vol_label": "Hangerő",
         "like_label": "Tetszik",
@@ -270,7 +275,10 @@ LOCALES = {
         "playlist_deleted": "Lejátszási lista törölve.",
         "rename_playlist_label": "Átnevezés",
         "import_genre_modal_title": "Dalok importálása műfajból",
-        "studio_locked_message": "A Playlist Stúdiót jelenleg {user} használja. Kérlek várd meg, amíg befejezi."
+        "studio_locked_message": "A Playlist Stúdiót jelenleg {user} használja. Kérlek várd meg, amíg befejezi.",
+        "ui_mode_label": "Kezelőfelület stílusa",
+        "ui_mode_full": "Teljes felület (Ikonok + Szöveg)",
+        "ui_mode_compact": "Kompakt felület (Csak ikonok)"
     }
 }
 

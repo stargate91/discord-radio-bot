@@ -71,6 +71,29 @@ class LanguageSelect(discord.ui.Select):
         msg = "English language selected" if selected == "en" else "Magyar nyelv kiválasztva"
         await interaction.response.send_message(msg, ephemeral=True)
 
+class UIModeSelect(discord.ui.Select):
+    def __init__(self, radio):
+        self.radio = radio
+        options = [
+            discord.SelectOption(label=t("ui_mode_full"), value="full"),
+            discord.SelectOption(label=t("ui_mode_compact"), value="compact")
+        ]
+        super().__init__(
+            placeholder=t("placeholder_ui"),
+            min_values=1,
+            max_values=1,
+            options=options,
+            custom_id="ui_mode_select"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        selected = self.values[0]
+        self.radio.is_compact = (selected == "compact")
+        msg = t("ui_mode_compact") if self.radio.is_compact else t("ui_mode_full")
+        await interaction.response.send_message(f"UI Mode: **{msg}**", ephemeral=True)
+        if _update_callback:
+            await _update_callback(self.radio.current_song or {})
+
 class DisconnectButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
@@ -106,36 +129,22 @@ class GenreSelect(discord.ui.Select):
         self.radio.dispatch(RadioAction.SET_GENRE, selected, user=interaction.user)
         await interaction.response.send_message(f"{t('switching_genre')} **{selected.upper()}**", ephemeral=True)
 
-class PlayButton(discord.ui.Button):
+class PlayPauseButton(discord.ui.Button):
     def __init__(self, radio):
+        is_paused = radio.status == RadioStatusEnum.PAUSED or radio.status == RadioStatusEnum.IDLE
+        label = None if radio.is_compact else (t('play_label') if is_paused else t('pause_label'))
+        emoji = Icons.PLAY if is_paused else Icons.PAUSE
+        
         super().__init__(
-            label=t('play_label') or 'Play',
-            emoji=Icons.PLAY,
+            label=label,
+            emoji=emoji,
             style=discord.ButtonStyle.secondary,
-            custom_id="play_button"
+            custom_id="play_pause_toggle"
         )
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
-        self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
-        await interaction.response.send_message(t("resuming"), ephemeral=True)
-
-class PauseButton(discord.ui.Button):
-    def __init__(self, radio):
-        super().__init__(
-            label=t('pause_label'),
-            emoji=Icons.PAUSE,
-            style=discord.ButtonStyle.secondary,
-            custom_id="pause_button"
-        )
-        self.radio = radio
-
-    async def callback(self, interaction: discord.Interaction):
-        if self.radio.status == RadioStatusEnum.IDLE:
-            await interaction.response.send_message(t("cannot_pause_stopped"), ephemeral=True)
-            return
-
-        if self.radio.status == RadioStatusEnum.PAUSED:
+        if self.radio.status == RadioStatusEnum.PAUSED or self.radio.status == RadioStatusEnum.IDLE:
             self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
             await interaction.response.send_message(t("resuming_feedback"), ephemeral=True)
         else:
@@ -145,7 +154,7 @@ class PauseButton(discord.ui.Button):
 class StopButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('stop_label'),
+            label=None if radio.is_compact else t('stop_label'),
             emoji=Icons.STOP,
             style=discord.ButtonStyle.secondary,
             custom_id="stop_button"
@@ -159,7 +168,7 @@ class StopButton(discord.ui.Button):
 class ForwardButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('forward_label'),
+            label=None if radio.is_compact else t('forward_label'),
             emoji=Icons.FORWARD,
             style=discord.ButtonStyle.secondary,
             custom_id="forward_button"
@@ -176,7 +185,7 @@ class ForwardButton(discord.ui.Button):
 class RandomButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('random_label'),
+            label=None if radio.is_compact else t('random_label'),
             emoji=Icons.RANDOM,
             style=discord.ButtonStyle.secondary,
             custom_id="random_button"
@@ -193,7 +202,7 @@ class RandomButton(discord.ui.Button):
 class ShuffleButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('shuffle_label'),
+            label=None if radio.is_compact else t('shuffle_label'),
             emoji=Icons.SHUFFLE,
             style=discord.ButtonStyle.secondary,
             custom_id="shuffle_button"
@@ -207,7 +216,7 @@ class ShuffleButton(discord.ui.Button):
 class BackButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=t('back_label'),
+            label=None if radio.is_compact else t('back_label'),
             emoji=Icons.BACK_STEP,
             style=discord.ButtonStyle.secondary,
             custom_id="back_button"
@@ -236,7 +245,7 @@ class BackButton(discord.ui.Button):
 class SeekButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('seek_label'),
+            label=None if radio.is_compact else t('seek_label'),
             emoji=Icons.SEEK,
             style=discord.ButtonStyle.secondary,
             custom_id="seek_button"
@@ -283,7 +292,7 @@ class SeekModal(Modal):
 class VolumeButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('vol_label'),
+            label=None if radio.is_compact else t('vol_label'),
             emoji=Icons.VOLUME,
             style=discord.ButtonStyle.secondary,
             custom_id="volume_button"
@@ -322,7 +331,7 @@ class VolumeModal(Modal):
 class LikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=t('like_label'),
+            label=None if radio.is_compact else t('like_label'),
             emoji=Icons.LIKE,
             style=discord.ButtonStyle.secondary,
             custom_id="like_button"
@@ -356,7 +365,7 @@ class LikeButton(discord.ui.Button):
 class DislikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=t('dislike_label'),
+            label=None if radio.is_compact else t('dislike_label'),
             emoji=Icons.DISLIKE,
             style=discord.ButtonStyle.secondary,
             custom_id="dislike_button"
@@ -390,7 +399,7 @@ class DislikeButton(discord.ui.Button):
 class DetailsButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('details_btn_label'),
+            label=None if radio.is_compact else t('details_btn_label'),
             emoji=Icons.INFO,
             style=discord.ButtonStyle.secondary,
             custom_id="details_button"
@@ -409,7 +418,7 @@ class DetailsButton(discord.ui.Button):
 class QueueToggleButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=t('queue_label'),
+            label=None if radio.is_compact else t('queue_label'),
             emoji=Icons.QUEUE,
             style=discord.ButtonStyle.secondary,
             custom_id="queue_toggle"
@@ -444,6 +453,11 @@ class UnifiedStandbyView(LayoutView):
             row_lang = ActionRow()
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
+            
+            row_ui = ActionRow()
+            row_ui.add_item(UIModeSelect(radio))
+            station_container.add_item(row_ui)
+            
             station_container.add_item(Separator())
             
             row_studio = ActionRow()
@@ -475,6 +489,10 @@ class FrequencyStationView(LayoutView):
             row_lang = ActionRow()
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
+            
+            row_ui = ActionRow()
+            row_ui.add_item(UIModeSelect(radio))
+            station_container.add_item(row_ui)
             
             station_container.add_item(Separator())
             row_meta = ActionRow()
@@ -568,37 +586,33 @@ class NowPlayingView(LayoutView):
 
         playback_row = ActionRow()
         playback_row.add_item(BackButton(radio, db))
-        playback_row.add_item(PlayButton(radio))
-        playback_row.add_item(PauseButton(radio))
+        playback_row.add_item(PlayPauseButton(radio))
         playback_row.add_item(StopButton(radio))
         playback_row.add_item(ForwardButton(radio))
+        playback_row.add_item(RandomButton(radio))
         master_container.add_item(playback_row)
 
-        meta_row_1 = ActionRow()
-        meta_row_1.add_item(RandomButton(radio))
-        meta_row_1.add_item(ShuffleButton(radio))
-        meta_row_1.add_item(SeekButton(radio))
-        meta_row_1.add_item(LikeButton(radio, db))
-        meta_row_1.add_item(DislikeButton(radio, db))
-        master_container.add_item(meta_row_1)
+        config_row = ActionRow()
+        config_row.add_item(ShuffleButton(radio))
+        config_row.add_item(SeekButton(radio))
+        config_row.add_item(VolumeButton(radio))
+        config_row.add_item(DetailsButton(radio))
+        config_row.add_item(QueueToggleButton(radio))
+        master_container.add_item(config_row)
 
-        meta_row_2 = ActionRow()
-        meta_row_2.add_item(DetailsButton(radio))
-        meta_row_2.add_item(QueueToggleButton(radio))
-        
+        library_row = ActionRow()
+        library_row.add_item(LikeButton(radio, db))
+        library_row.add_item(DislikeButton(radio, db))
         from ui_search import SearchButton
         from ui_studio import PlaylistViewButton, HistoryButton
-        
-        meta_row_2.add_item(SearchButton(radio, db))
-        meta_row_2.add_item(PlaylistViewButton(radio, db))
-        meta_row_2.add_item(HistoryButton(radio, db))
-        master_container.add_item(meta_row_2)
+        library_row.add_item(SearchButton(radio, db))
+        library_row.add_item(PlaylistViewButton(radio, db))
+        library_row.add_item(HistoryButton(radio, db))
+        master_container.add_item(library_row)
 
         tools_row = ActionRow()
-        tools_row.add_item(VolumeButton(radio))
-        if radio.show_queue:
-            from ui_search import QueueViewButton
-            tools_row.add_item(QueueViewButton(radio))
+        from ui_search import QueueViewButton
+        tools_row.add_item(QueueViewButton(radio))
         master_container.add_item(tools_row)
 
         self.add_item(master_container)

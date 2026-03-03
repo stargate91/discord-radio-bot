@@ -28,6 +28,7 @@ class Icons:
     CALENDAR = discord.PartialEmoji.from_str("<:calendardays:1478347283429982299>")
     SWEEP = discord.PartialEmoji.from_str("<:brushcleaning:1478347327361253426>")
     QUEUE = discord.PartialEmoji.from_str("<:rows3:1478347365923688543>")
+    FULL_LIST = discord.PartialEmoji.from_str("<:rows4:1478409560380407859>")
     
     # Playlist Studio
     STUDIO = discord.PartialEmoji.from_str("<:blocks:1478234138271285248>")

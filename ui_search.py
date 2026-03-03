@@ -19,7 +19,7 @@ async def check_editor_lock(radio, interaction):
 class SearchButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=t('search_label'),
+            label=None if radio.is_compact else t('search_label'),
             emoji=Icons.SEARCH,
             style=discord.ButtonStyle.secondary,
             custom_id="search_button"
@@ -211,7 +211,7 @@ class QueueAllButton(discord.ui.Button):
 
 class QueueViewButton(discord.ui.Button):
     def __init__(self, radio):
-        super().__init__(label=t('full_queue_label'), emoji=Icons.QUEUE, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
+        super().__init__(label=None if radio.is_compact else t('full_queue_label'), emoji=Icons.FULL_LIST, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):

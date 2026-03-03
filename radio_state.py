@@ -44,6 +44,7 @@ class RadioState:
         self.editing_playlist_id: int | None = None
         self.playlist_editor_user: int | None = None
         self.last_editor_page: int = 0
+        self.is_compact: bool = (config.default_ui_mode == "compact")
 
     def refresh_queue(self):
         self.queue = []
