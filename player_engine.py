@@ -1,6 +1,7 @@
 import asyncio
 import discord
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
+from ui_icons import Icons
 
 _bot_ref = None
 _config_ref = None
@@ -147,13 +148,13 @@ async def radio_player():
             _radio_ref.is_seeking = False
 
             if not song:
-                print("❌ There is no track in this:", _radio_ref.genre)
+                print(f"{Icons.CLOSE} There is no track in this:", _radio_ref.genre)
                 _radio_ref.status = RadioStatusEnum.IDLE
                 await asyncio.sleep(5)
                 continue
 
             _radio_ref.status = RadioStatusEnum.PLAYING
-            print("▶ Playing:", song)
+            print(f"{Icons.PLAY} Playing:", song)
 
             before_opts = "-nostdin -re"
             if _radio_ref.seek_position is not None:

@@ -153,7 +153,7 @@ def scan_music_library(config, db):
         cursor = conn.cursor()
 
         for genre, paths in config.genres.items():
-            print(f"\n Genre: {genre}")
+
 
             for base_path in paths:
                 base_path = Path(base_path)
@@ -165,7 +165,7 @@ def scan_music_library(config, db):
                 for root, _, files in os.walk(base_path):
                     for file in files:
 
-                        print(f"\n File: {file}")
+
 
                         ext = Path(file).suffix.lower().replace(".", "")
                         if ext not in config.supported_extensions:

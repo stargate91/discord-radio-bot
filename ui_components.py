@@ -2,6 +2,7 @@ import discord
 from discord.ui import Modal, TextInput
 from pathlib import Path
 from ui_translate import t
+from ui_icons import Icons
 from ui_utils import fixed
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
 
@@ -16,9 +17,9 @@ class StationSelect(discord.ui.Select):
         self.radio = radio
         options = [
             discord.SelectOption(
-                label=c.name,
+                label=f"{Icons.UPLINK} {c.name}",
                 value=str(c.id),
-                emoji="📡"
+                emoji=Icons.UPLINK
             ) for c in channels
         ]
         super().__init__(
@@ -32,16 +33,14 @@ class StationSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         channel_id = int(self.values[0])
         
-        restricted_channels = {
-            1442881688043524228: 1423540338374479914,
-            1455966091950952582: 1455966276982669332
-        }
+        # Admin bypass or role check
+        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+        is_admin = self.radio.config.admin_role_id in user_role_ids
 
-        if channel_id in restricted_channels:
-            required_role_id = restricted_channels[channel_id]
-            user_roles = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+        if channel_id in self.radio.config.restricted_channels and not is_admin:
+            required_role_id = self.radio.config.restricted_channels[channel_id]
             
-            if required_role_id not in user_roles:
+            if required_role_id not in user_role_ids:
                 await interaction.response.send_message(t("no_permission"), ephemeral=True)
                 return
 
@@ -52,8 +51,8 @@ class LanguageSelect(discord.ui.Select):
     def __init__(self, radio):
         self.radio = radio
         options = [
-            discord.SelectOption(label="English", value="en", emoji="🇺🇸"),
-            discord.SelectOption(label="Magyar", value="hu", emoji="🇭🇺")
+            discord.SelectOption(label="English", value="en", emoji=Icons.LANG_EN),
+            discord.SelectOption(label="Magyar", value="hu", emoji=Icons.LANG_HU)
         ]
         super().__init__(
             placeholder=t("placeholder_lang"),
@@ -73,7 +72,7 @@ class LanguageSelect(discord.ui.Select):
 class DisconnectButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"🌌 {t('sever_uplink') or 'Sever Uplink'}",
+            label=f"{Icons.STANDBY} {t('sever_uplink') or 'Sever Uplink'}",
             style=discord.ButtonStyle.secondary,
             custom_id="disconnect_button"
         )
@@ -92,7 +91,7 @@ class GenreSelect(discord.ui.Select):
             genres.append("levifav")
         options = [discord.SelectOption(label=g.upper(), value=g) for g in genres]
         super().__init__(
-            placeholder=f"🎼 {t('placeholder_genre')}",
+            placeholder=f"{Icons.GENRE} {t('placeholder_genre')}",
             min_values=1,
             max_values=1,
             options=options,
@@ -107,7 +106,7 @@ class GenreSelect(discord.ui.Select):
 class PlayButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"▶ {t('play_label') or 'Play'}",
+            label=f"{Icons.PLAY} {t('play_label') or 'Play'}",
             style=discord.ButtonStyle.secondary,
             custom_id="play_button"
         )
@@ -120,7 +119,7 @@ class PlayButton(discord.ui.Button):
 class PauseButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"⏸ {t('pause_label')}",
+            label=f"{Icons.PAUSE} {t('pause_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="pause_button"
         )
@@ -141,7 +140,7 @@ class PauseButton(discord.ui.Button):
 class StopButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"⏹ {t('stop_label')}",
+            label=f"{Icons.STOP} {t('stop_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="stop_button"
         )
@@ -154,7 +153,7 @@ class StopButton(discord.ui.Button):
 class ForwardButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"⏭ {t('forward_label')}",
+            label=f"{Icons.FORWARD} {t('forward_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="forward_button"
         )
@@ -170,7 +169,7 @@ class ForwardButton(discord.ui.Button):
 class RandomButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"🎲 {t('random_label')}",
+            label=f"{Icons.RANDOM} {t('random_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="random_button"
         )
@@ -186,7 +185,7 @@ class RandomButton(discord.ui.Button):
 class ShuffleButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"🔀 {t('shuffle_label')}",
+            label=f"{Icons.SHUFFLE} {t('shuffle_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="shuffle_button"
         )
@@ -199,7 +198,7 @@ class ShuffleButton(discord.ui.Button):
 class BackButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"⏮ {t('back_label')}",
+            label=f"{Icons.BACK_STEP} {t('back_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="back_button"
         )
@@ -224,14 +223,14 @@ class BackButton(discord.ui.Button):
         
         if prev_song:
             self.radio.dispatch(RadioAction.BACK, prev_song, user=interaction.user)
-            await interaction.response.send_message(f"⏮ {t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
+            await interaction.response.send_message(f"{Icons.BACK_STEP} {t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
         else:
             await interaction.response.send_message(t("back_error"), ephemeral=True)
 
 class SeekButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"⏩ {t('seek_label')}",
+            label=f"{Icons.SEEK} {t('seek_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="seek_button"
         )
@@ -280,7 +279,7 @@ class SeekModal(Modal):
 class VolumeButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"🔊 {t('vol_label')}",
+            label=f"{Icons.VOLUME} {t('vol_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="volume_button"
         )
@@ -320,7 +319,7 @@ class VolumeModal(Modal):
 class LikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"❤️ {t('like_label')}",
+            label=f"{Icons.LIKE} {t('like_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="like_button"
         )
@@ -354,7 +353,7 @@ class LikeButton(discord.ui.Button):
 class DislikeButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"👎 {t('dislike_label')}",
+            label=f"{Icons.DISLIKE} {t('dislike_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="dislike_button"
         )
@@ -388,7 +387,7 @@ class DislikeButton(discord.ui.Button):
 class DetailsButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"📂 {t('details_btn_label')}",
+            label=f"{Icons.INFO} {t('details_btn_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="details_button"
         )
@@ -399,14 +398,14 @@ class DetailsButton(discord.ui.Button):
         self.radio.show_details = not self.radio.show_details
         if _update_callback: await _update_callback(self.radio.current_song)
         await interaction.followup.send(
-            f"📂 {t('info_visibility')}: **{t('shown') if self.radio.show_details else t('hidden')}**",
+            f"{Icons.INFO} {t('info_visibility')}: **{t('shown') if self.radio.show_details else t('hidden')}**",
             ephemeral=True
         )
 
 class QueueToggleButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"📋 {t('queue_label')}",
+            label=f"{Icons.QUEUE} {t('queue_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="queue_toggle"
         )
@@ -417,14 +416,52 @@ class QueueToggleButton(discord.ui.Button):
         self.radio.show_queue = not self.radio.show_queue
         if _update_callback: await _update_callback(self.radio.current_song)
         await interaction.followup.send(
-            f"📋 {t('queue_visibility')}: **{t('shown') if self.radio.show_queue else t('hidden')}**",
+            f"{Icons.QUEUE} {t('queue_visibility')}: **{t('shown') if self.radio.show_queue else t('hidden')}**",
             ephemeral=True
         )
+
+class PlaylistViewButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        super().__init__(
+            label=f"{Icons.PLAYLIST} {t('playlists_tab')}",
+            style=discord.ButtonStyle.secondary,
+            custom_id="playlist_view_button"
+        )
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        from ui_views import SearchResultsView
+        from ui import embed_state
+        
+        await interaction.response.defer()
+        
+        # We use empty query because we just want to list all playlists
+        playlists = self.db.get_all_playlists()
+        self.radio.active_view_type = "search"
+        self.radio.last_search_query = ""
+        self.radio.last_search_results = playlists
+        self.radio.last_search_user = interaction.user
+        self.radio.last_search_page = 0
+        self.radio.last_search_type = "playlists"
+        
+        view = SearchResultsView(self.radio, self.db, playlists, "", interaction.user, search_type="playlists")
+        
+        # Cleanup existing search message if any
+        old_id = embed_state.load_message_id("search")
+        if old_id:
+            try:
+                old_msg = await interaction.channel.fetch_message(old_id)
+                await old_msg.delete()
+            except: pass
+            
+        msg = await interaction.followup.send(view=view, wait=True)
+        embed_state.save_message_id("search", msg.id)
 
 class SearchButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"🔍 {t('search_label')}",
+            label=f"{Icons.SEARCH} {t('search_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="search_button"
         )
@@ -438,7 +475,7 @@ class SearchButton(discord.ui.Button):
 class QueueViewButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"📋 {t('full_queue_label')}",
+            label=f"{Icons.QUEUE} {t('full_queue_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="full_queue_view"
         )
@@ -467,7 +504,7 @@ class RemoveFromQueueButton(discord.ui.Button):
         import random, string
         unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
         super().__init__(
-            emoji="🗑️",
+            emoji=Icons.REMOVE,
             style=discord.ButtonStyle.secondary,
             custom_id=f"remove_q_{song.get('id', 0)}_{unique}"
         )
@@ -481,7 +518,7 @@ class RemoveFromQueueButton(discord.ui.Button):
 class HistoryButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
-            label=f"📜 {t('history_label')}",
+            label=f"{Icons.HISTORY} {t('history_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="history_button"
         )
@@ -494,7 +531,7 @@ class HistoryButton(discord.ui.Button):
         
         await interaction.response.defer()
         
-        history = self.db.get_full_history(limit=10, offset=0)
+        history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0)
         total_count = self.db.get_history_count()
         
         self.radio.active_view_type = "history"
@@ -567,7 +604,7 @@ class AddSongButton(discord.ui.Button):
         import string
         unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
         super().__init__(
-            emoji="➕",
+            emoji=Icons.ADD,
             style=discord.ButtonStyle.secondary,
             custom_id=f"add_song_{song['id']}_{unique}"
         )
@@ -629,6 +666,8 @@ class TabButton(discord.ui.Button):
             results = self.db.search_artists(self.query)
         elif self.search_type == "albums":
             results = self.db.search_albums(self.query)
+        elif self.search_type == "playlists":
+            results = self.db.get_all_playlists()
             
         view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type)
         await interaction.edit_original_response(view=view)
@@ -659,6 +698,9 @@ class SearchBySelectionButton(discord.ui.Button):
             new_search_type = "albums"
         elif self.search_type == "album_songs":
             results = self.db.search_by_album(self.value[0], self.value[1])
+        elif self.search_type == "playlist_songs":
+            results = self.db.get_playlist_songs(self.value)
+            new_search_type = "songs"
             
         view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type, original_query=self.original_query)
         await interaction.edit_original_response(view=view)
@@ -704,9 +746,9 @@ class QueueAllButton(discord.ui.Button):
 class HistoryFilterButton(discord.ui.Button):
     def __init__(self, radio, db):
         label = t("filter_label")
-        emoji = "📅"
+        emoji = Icons.CALENDAR
         if radio.filter_from or radio.filter_to:
-            emoji = "🧹"
+            emoji = Icons.SWEEP
             label = t("clear_filter_label")
             
         super().__init__(
@@ -722,7 +764,7 @@ class HistoryFilterButton(discord.ui.Button):
             self.radio.filter_from = None
             self.radio.filter_to = None
             from ui_views import HistoryView
-            history = self.db.get_full_history(limit=10, offset=0)
+            history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0)
             total_count = self.db.get_history_count()
             view = HistoryView(self.radio, self.db, history, total_count, page=0)
             await interaction.response.edit_message(view=view)
@@ -781,7 +823,7 @@ class HistoryFilterModal(discord.ui.Modal):
         
         await interaction.response.defer()
         
-        history = self.db.get_full_history(limit=10, offset=0, filter_from=f_from, filter_to=f_to)
+        history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0, filter_from=f_from, filter_to=f_to)
         total_count = self.db.get_history_count(filter_from=f_from, filter_to=f_to)
         
         view = HistoryView(self.radio, self.db, history, total_count, page=0)
@@ -792,17 +834,20 @@ class DeleteHistoryButton(discord.ui.Button):
         super().__init__(
             label=t("delete_history_label"),
             style=discord.ButtonStyle.danger,
-            emoji="🗑️",
+            emoji=Icons.REMOVE,
             custom_id="delete_history_button"
         )
         self.radio = radio
-        self.db = db
-
     async def callback(self, interaction: discord.Interaction):
+        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+        if self.radio.config.admin_role_id not in user_role_ids:
+            await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
+            return
+
         await interaction.response.defer(ephemeral=True)
         self.db.clear_history()
         from ui_views import HistoryView
-        history = self.db.get_full_history(limit=10, offset=0)
+        history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0)
         total_count = self.db.get_history_count()
         view = HistoryView(self.radio, self.db, history, total_count, page=0)
         await interaction.edit_original_response(view=view)
@@ -810,13 +855,14 @@ class DeleteHistoryButton(discord.ui.Button):
 class PlaylistStudioButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"🛠️ {t('playlist_studio_label')}",
+            label=f"{Icons.STUDIO} {t('playlist_studio_label')}",
             style=discord.ButtonStyle.secondary,
             custom_id="playlist_studio_button"
         )
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
+
         if self.radio.playlist_editor_user and self.radio.playlist_editor_user != interaction.user.id:
             try:
                 member = await interaction.guild.fetch_member(self.radio.playlist_editor_user)
@@ -853,7 +899,7 @@ class PlaylistSelect(discord.ui.Select):
         self.radio = radio
         self.db = db
         options = [
-            discord.SelectOption(label=p['name'], value=str(p['id']), emoji="📝")
+            discord.SelectOption(label=p['name'], value=str(p['id']), emoji=Icons.PLAYLIST)
             for p in playlists
         ]
         super().__init__(
@@ -872,7 +918,7 @@ class PlaylistSelect(discord.ui.Select):
 
 class NewPlaylistButton(discord.ui.Button):
     def __init__(self, radio, db):
-        super().__init__(label=t("new_playlist_label"), style=discord.ButtonStyle.primary, emoji="➕")
+        super().__init__(label=t("new_playlist_label"), style=discord.ButtonStyle.primary, emoji=Icons.ADD)
         self.radio = radio
         self.db = db
 
@@ -899,7 +945,7 @@ class RemoveFromPlaylistButton(discord.ui.Button):
     def __init__(self, radio, db, playlist_id, song_path):
         import random, string
         unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-        super().__init__(emoji="🗑️", style=discord.ButtonStyle.secondary, custom_id=f"rem_pl_{unique}")
+        super().__init__(emoji=Icons.REMOVE, style=discord.ButtonStyle.secondary, custom_id=f"rem_pl_{unique}")
         self.radio = radio
         self.db = db
         self.playlist_id = playlist_id
@@ -913,12 +959,17 @@ class RemoveFromPlaylistButton(discord.ui.Button):
 
 class DeletePlaylistButton(discord.ui.Button):
     def __init__(self, radio, db, playlist_id):
-        super().__init__(label=t("delete_playlist_label"), style=discord.ButtonStyle.danger, emoji="⚠️")
+        super().__init__(label=t("delete_playlist_label"), style=discord.ButtonStyle.danger, emoji=Icons.WARNING)
         self.radio = radio
         self.db = db
         self.playlist_id = playlist_id
 
     async def callback(self, interaction: discord.Interaction):
+        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+        if self.radio.config.admin_role_id not in user_role_ids:
+            await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
+            return
+
         await interaction.response.defer(ephemeral=True)
         self.db.delete_playlist(self.playlist_id)
         self.radio.editing_playlist_id = None
@@ -928,7 +979,7 @@ class DeletePlaylistButton(discord.ui.Button):
 
 class ExitStudioButton(discord.ui.Button):
     def __init__(self, radio):
-        super().__init__(label=t("save_exit_label"), style=discord.ButtonStyle.secondary, emoji="🚪")
+        super().__init__(label=t("save_exit_label"), style=discord.ButtonStyle.secondary, emoji=Icons.EXIT)
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
@@ -941,7 +992,7 @@ class ExitStudioButton(discord.ui.Button):
 
 class RenamePlaylistButton(discord.ui.Button):
     def __init__(self, radio, db, playlist_id):
-        super().__init__(label=t("rename_playlist_label") or "Rename", style=discord.ButtonStyle.secondary, emoji="✏️")
+        super().__init__(label=t("rename_playlist_label") or "Rename", style=discord.ButtonStyle.secondary, emoji=Icons.RENAME)
         self.radio = radio
         self.db = db
         self.playlist_id = playlist_id
@@ -983,7 +1034,7 @@ class MoveSongInPlaylistButton(discord.ui.Button):
 
 class BackToEditorButton(discord.ui.Button):
     def __init__(self, radio):
-        super().__init__(label=t("back_label") or "Back", style=discord.ButtonStyle.secondary, emoji="🔙")
+        super().__init__(label=t("back_label") or "Back", style=discord.ButtonStyle.secondary, emoji=Icons.BACK)
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):

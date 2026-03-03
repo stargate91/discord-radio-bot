@@ -1,16 +1,39 @@
 {
-    "guild_id": "GUILD_ID",
-    "voice_channel_id": "VOICE_CHANNEL_ID",
-    "radio_text_channel_id": "RADIO_TEXT_CHANNEL_ID",
-    "default_genre": "Genre 1",
-    "supported_extensions": ["mp3", "flac", "wav"],
+    "guild_id": "YOUR_GUILD_ID",
+    "voice_channel_id": "YOUR_VOICE_CHANNEL_ID",
+    "radio_text_channel_id": "YOUR_RADIO_TEXT_CHANNEL_ID",
+    "afk_channel_id": "YOUR_AFK_CHANNEL_ID",
+    "default_genre": "Electronic",
+    "supported_extensions": [
+        "mp3",
+        "flac",
+        "wav"
+    ],
+    "admin_role_id": 0,
+    "restricted_channels": {
+        "CHANNEL_ID": "ROLE_ID"
+    },
+    "ffmpeg_path": "ffmpeg",
+    "ui_settings": {
+        "search_items_per_page": 5,
+        "history_items_per_page": 10,
+        "queue_items_per_page": 10,
+        "playlist_items_per_page": 5,
+        "queue_refresh_limit": 11,
+        "player_upcoming_limit": 5,
+        "levifav_min_rating": 5
+    },
     "genres": {
-        "Genre 1": [
-            "C:/music/genre_1_a",
-            "C:/music/genre_1_b"
+        "Electronic": [
+            "C:/Music/Electronic/Labels",
+            "C:/Music/Electronic/Releases"
         ],
-        "Genre 2": [
-            "C:/music/genre_2"
+        "Rock": [
+            "C:/Music/Rock"
+        ],
+        "Chillout": [
+            "C:/Music/Ambient",
+            "C:/Music/Chillout"
         ]
     }
 }

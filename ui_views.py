@@ -2,15 +2,17 @@ import discord
 from discord.ui import LayoutView, ActionRow, Container, Section, TextDisplay, Thumbnail, Separator
 from pathlib import Path
 from ui_translate import t
+from ui_icons import Icons
 from ui_utils import format_duration, fixed
 from radio_actions import RadioState as RadioStatusEnum, RadioAction
 from ui_components import (
     StationSelect, LanguageSelect, DisconnectButton, GenreSelect, 
     PlayButton, PauseButton, StopButton, ForwardButton, RandomButton, ShuffleButton, BackButton, SeekButton, 
     VolumeButton, LikeButton, DislikeButton, DetailsButton, 
-    QueueToggleButton, QueueViewButton, RemoveFromQueueButton, SearchButton, HistoryButton, HistoryFilterButton, DeleteHistoryButton, AddSongButton, QueueAllButton,
+    QueueToggleButton, QueueViewButton, RemoveFromQueueButton, SearchButton, PlaylistViewButton, HistoryButton, HistoryFilterButton, DeleteHistoryButton, AddSongButton, QueueAllButton,
     TabButton, SearchBySelectionButton, PlaylistStudioButton, RenamePlaylistButton, MoveSongInPlaylistButton, BackToEditorButton
 )
+from ui_theme import Theme
 
 _bot_ref = None
 _config_ref = None
@@ -25,12 +27,12 @@ class UnifiedStandbyView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         self.radio = radio
 
-        station_container = Container(accent_color=0x2b2d31)
+        station_container = Container(accent_color=Theme.BACKGROUND)
         station_container.add_item(TextDisplay(f"## {t('system_sync')}\n{t('synchro_subtitle')}"))
         
         guild = _bot_ref.get_guild(_config_ref.guild_id)
         if guild:
-            afk_id = 1275929869703970876
+            afk_id = _config_ref.afk_channel_id
             v_channels = [c for c in sorted(guild.voice_channels, key=lambda c: c.position) if c.id != afk_id][:25]
             row = ActionRow()
             row.add_item(StationSelect(radio, v_channels))
@@ -45,7 +47,7 @@ class UnifiedStandbyView(discord.ui.LayoutView):
             station_container.add_item(row_studio)
         self.add_item(station_container)
 
-        standby_container = Container(accent_color=0x2b2d31)
+        standby_container = Container(accent_color=Theme.BACKGROUND)
         standby_container.add_item(TextDisplay(f"## {t('standby_mode')}\n{t('standby_subtitle')}"))
         self.add_item(standby_container)
 
@@ -54,12 +56,12 @@ class FrequencyStationView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         self.radio = radio
 
-        station_container = Container(accent_color=0x2b2d31)
+        station_container = Container(accent_color=Theme.BACKGROUND)
         station_container.add_item(TextDisplay(f"## {t('system_sync')}\n{t('synchro_subtitle')}"))
         
         guild = _bot_ref.get_guild(_config_ref.guild_id)
         if guild:
-            afk_id = 1275929869703970876
+            afk_id = _config_ref.afk_channel_id
             v_channels = [c for c in sorted(guild.voice_channels, key=lambda c: c.position) if c.id != afk_id][:25]
             row = ActionRow()
             row.add_item(StationSelect(radio, v_channels))
@@ -80,17 +82,17 @@ class NowPlayingView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         song = radio.current_song or {}
 
-        accent_color = 0x5865F2
+        accent_color = Theme.PLAYING
         status_key = "now_playing"
-        status_emoji = "🎧"
+        status_emoji = Icons.HEADPHONES
         if radio.status == RadioStatusEnum.PAUSED:
             status_key = "paused"
-            status_emoji = "⏸️"
-            accent_color = 0xFEE75C
+            status_emoji = Icons.PAUSE
+            accent_color = Theme.PAUSED
         elif radio.status == RadioStatusEnum.IDLE:
             status_key = "idle"
-            status_emoji = "⏹️"
-            accent_color = 0xED4245
+            status_emoji = Icons.STOP
+            accent_color = Theme.IDLE
         status_title = f"{status_emoji} {t(status_key)}"
 
         master_container = Container(accent_color=accent_color)
@@ -116,7 +118,7 @@ class NowPlayingView(discord.ui.LayoutView):
         ]
 
         if radio.show_details:
-            info_lines.append(f"\n**📂 {t('details_label')}**")
+            info_lines.append(f"\n**{Icons.INFO} {t('details_label')}**")
             info_lines.append(f"**{t('year')}:** {song.get('date', 'Unknown')}")
             info_lines.append(f"**{t('label')}:** {song.get('label', 'Unknown')}")
             info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown') or 'Unknown'}")
@@ -130,10 +132,10 @@ class NowPlayingView(discord.ui.LayoutView):
                 info_lines.append(f"**{t('last_played_label')}:** ---")
 
         if radio.show_queue:
-            info_lines.append(f"\n**📋 {t('up_next')}**")
+            info_lines.append(f"\n**{Icons.QUEUE} {t('up_next')}**")
             q_list = []
             display_queue = radio.get_display_queue()
-            for i, q_song in enumerate(display_queue[:5], 1):
+            for i, q_song in enumerate(display_queue[:radio.config.player_upcoming_limit], 1):
                 q_artist = fixed(q_song.get('artist', 'Unknown'), 22).strip()
                 q_title = fixed(q_song.get('title', 'Unknown'), 22).strip()
                 q_list.append(f"{i}. {q_artist} - {q_title}")
@@ -172,17 +174,18 @@ class NowPlayingView(discord.ui.LayoutView):
         master_container.add_item(meta_row_1)
 
         meta_row_2 = ActionRow()
-        meta_row_2.add_item(VolumeButton(radio))
         meta_row_2.add_item(DetailsButton(radio))
         meta_row_2.add_item(QueueToggleButton(radio))
         meta_row_2.add_item(SearchButton(radio, db))
+        meta_row_2.add_item(PlaylistViewButton(radio, db))
         meta_row_2.add_item(HistoryButton(radio, db))
         master_container.add_item(meta_row_2)
 
+        tools_row = ActionRow()
+        tools_row.add_item(VolumeButton(radio))
         if radio.show_queue:
-            q_ctrl_row = ActionRow()
-            q_ctrl_row.add_item(QueueViewButton(radio))
-            master_container.add_item(q_ctrl_row)
+            tools_row.add_item(QueueViewButton(radio))
+        master_container.add_item(tools_row)
 
         self.add_item(master_container)
 
@@ -198,7 +201,7 @@ class SearchResultsView(discord.ui.LayoutView):
         self.page = page
         self.search_type = search_type
         self.language = radio.language
-        self.items_per_page = 5
+        self.items_per_page = radio.config.search_items_per_page
         self.total_pages = (len(results) - 1) // self.items_per_page + 1 if results else 1
         
         self.existing_paths = set()
@@ -209,15 +212,15 @@ class SearchResultsView(discord.ui.LayoutView):
         self.radio.active_view_type = "search"
         print(f"[SEARCH VIEW] Initializing. Radio lang: {self.radio.language}, Translation test ('songs_tab'): {t('songs_tab')}")
 
-        container = Container(accent_color=0x2b2d31)
+        container = Container(accent_color=Theme.BACKGROUND)
         
         tab_row = ActionRow()
         tab_row.add_item(TabButton(radio, db, t("songs_tab"), "songs", self.original_query, user, active=(search_type == "songs" and query == self.original_query)))
         tab_row.add_item(TabButton(radio, db, t("artists_tab"), "artists", self.original_query, user, active=(search_type == "artists" and query == self.original_query)))
         tab_row.add_item(TabButton(radio, db, t("albums_tab"), "albums", self.original_query, user, active=(search_type == "albums" and query == self.original_query)))
-        tab_row.add_item(discord.ui.Button(label=t("playlists_tab"), style=discord.ButtonStyle.secondary, disabled=True))
+        tab_row.add_item(TabButton(radio, db, t("playlists_tab"), "playlists", self.original_query, user, active=(search_type == "playlists" and query == self.original_query)))
         
-        close_btn = discord.ui.Button(emoji="❌", style=discord.ButtonStyle.secondary, custom_id="close_search")
+        close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary, custom_id="close_search")
         async def close_callback(interaction):
              await interaction.response.defer()
              from ui import embed_state
@@ -232,7 +235,7 @@ class SearchResultsView(discord.ui.LayoutView):
             playlists = self.db.get_all_playlists()
             playlist_name = next((p['name'] for p in playlists if p['id'] == self.radio.editing_playlist_id), "...")
             song_count = len(self.existing_paths)
-            container.add_item(TextDisplay(f"📌 **{playlist_name}** ({song_count} {t('songs')})"))
+            container.add_item(TextDisplay(f"{Icons.STATUS} **{playlist_name}** ({song_count} {t('songs')})"))
             container.add_item(Separator())
 
         start = self.page * self.items_per_page
@@ -249,7 +252,7 @@ class SearchResultsView(discord.ui.LayoutView):
                     song_info = f"**{i}. {item['title']}** {item['artist']} • {format_duration(item['duration'])}"
                     btn = AddSongButton(radio, item)
                     if is_added:
-                        btn.emoji = "✅"
+                        btn.emoji = Icons.SUCCESS
                         btn.style = discord.ButtonStyle.success
                     container.add_item(Section(song_info, accessory=btn))
                 elif self.search_type == "artists":
@@ -262,6 +265,10 @@ class SearchResultsView(discord.ui.LayoutView):
                     album_info = f"**{i}. {item['album']}** {item['artist']}"
                     section = Section(album_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "album_songs", (item['artist'], item['album']), user, original_query=self.original_query))
                     container.add_item(section)
+                elif self.search_type == "playlists":
+                    playlist_info = f"**{i}. {item['name']}**"
+                    section = Section(playlist_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "playlist_songs", item['id'], user, original_query=self.original_query))
+                    container.add_item(section)
 
         container.add_item(Separator())
         
@@ -270,7 +277,7 @@ class SearchResultsView(discord.ui.LayoutView):
 
         nav_row = ActionRow()
         
-        prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
         async def prev_callback(interaction):
             await interaction.response.defer()
             self.page -= 1
@@ -278,7 +285,7 @@ class SearchResultsView(discord.ui.LayoutView):
         prev_btn.callback = prev_callback
         nav_row.add_item(prev_btn)
 
-        next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
         async def next_callback(interaction):
             await interaction.response.defer()
             self.page += 1
@@ -320,13 +327,13 @@ class HistoryView(LayoutView):
         self.history = history
         self.total_count = total_count
         self.page = page
-        self.items_per_page = 10
+        self.items_per_page = radio.config.history_items_per_page
         self.total_pages = (total_count + self.items_per_page - 1) // self.items_per_page
         self.update_view_all()
 
     def update_view_all(self):
         self.clear_items()
-        container = Container(accent_color=0x2b2d31)
+        container = Container(accent_color=Theme.BACKGROUND)
         
         if not self.history:
             container.add_item(TextDisplay(f"*{t('empty')}*"))
@@ -350,14 +357,14 @@ class HistoryView(LayoutView):
         container.add_item(Separator())
         
         nav_row = ActionRow()
-        prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
         async def prev_callback(interaction):
             await interaction.response.defer()
             self.page -= 1
             await self.refresh_data(interaction)
         prev_btn.callback = prev_callback
         
-        next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
         async def next_callback(interaction):
             await interaction.response.defer()
             self.page += 1
@@ -371,7 +378,7 @@ class HistoryView(LayoutView):
             await self.refresh_data(interaction)
         last_btn.callback = last_callback
         
-        close_btn = discord.ui.Button(emoji="❌", style=discord.ButtonStyle.secondary)
+        close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
         async def close_callback(interaction):
             await interaction.response.defer()
             from ui import embed_state
@@ -399,7 +406,7 @@ class HistoryView(LayoutView):
         container.add_item(ctrl_row)
         
         if self.radio.filter_from or self.radio.filter_to:
-            filter_text = f"📍 {t('filter_label')}: "
+            filter_text = f"{Icons.LOCATION} {t('filter_label')}: "
             if self.radio.filter_from: filter_text += f"{t('filter_from_label').split(' ')[0]} {self.radio.filter_from} "
             if self.radio.filter_to: filter_text += f"{t('filter_to_label').split(' ')[0]} {self.radio.filter_to}"
             container.add_item(TextDisplay(f"*{filter_text}*"))
@@ -422,11 +429,11 @@ class FullQueueView(discord.ui.LayoutView):
         super().__init__(timeout=None)
         self.radio = radio
         self.page = page
-        self.items_per_page = 10
+        self.items_per_page = radio.config.queue_items_per_page
         self.queue_list = radio.queue
         self.total_pages = (len(self.queue_list) - 1) // self.items_per_page + 1 if self.queue_list else 1
         
-        container = Container(accent_color=0x5865F2)
+        container = Container(accent_color=Theme.PRIMARY)
         
         if not self.queue_list:
             container.add_item(TextDisplay(f"*{t('empty')}*"))
@@ -444,21 +451,21 @@ class FullQueueView(discord.ui.LayoutView):
         container.add_item(TextDisplay(footer))
         
         nav_row = ActionRow()
-        prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
         async def prev_callback(interaction):
             await interaction.response.defer()
             self.page -= 1
             await self.refresh_view(interaction)
         prev_btn.callback = prev_callback
         
-        next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
         async def next_callback(interaction):
             await interaction.response.defer()
             self.page += 1
             await self.refresh_view(interaction)
         next_btn.callback = next_callback
         
-        close_btn = discord.ui.Button(emoji="❌", style=discord.ButtonStyle.secondary)
+        close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
         async def close_callback(interaction):
             await interaction.response.defer()
             from ui import embed_state
@@ -490,7 +497,7 @@ class PlaylistStudioView(discord.ui.LayoutView):
         self.radio = radio
         self.db = db
         
-        container = Container(accent_color=0x2b2d31)
+        container = Container(accent_color=Theme.BACKGROUND)
         container.add_item(TextDisplay(f"## {t('playlist_studio_title')}\n{t('playlist_studio_subtitle')}"))
         
         playlists = db.get_all_playlists()
@@ -515,7 +522,7 @@ class PlaylistEditorView(discord.ui.LayoutView):
         self.db = db
         self.playlist_id = playlist_id
         self.page = page
-        self.items_per_page = 5
+        self.items_per_page = radio.config.playlist_items_per_page
         self.radio.active_view_type = "playlist_editor"
         
         songs = db.get_playlist_songs(playlist_id)
@@ -525,7 +532,7 @@ class PlaylistEditorView(discord.ui.LayoutView):
         from ui_utils import format_duration
         duration_str = format_duration(total_duration)
         
-        container = Container(accent_color=0x5865F2)
+        container = Container(accent_color=Theme.PRIMARY)
         playlists = db.get_all_playlists()
         playlist_name = next((p['name'] for p in playlists if p['id'] == playlist_id), "Unknown")
         
@@ -542,8 +549,8 @@ class PlaylistEditorView(discord.ui.LayoutView):
                 info = f"**{i}. {song['artist']} - {song['title']}**"
                 
                 controls = ActionRow()
-                controls.add_item(MoveSongInPlaylistButton(radio, db, playlist_id, song['path'], -1, "⬆️"))
-                controls.add_item(MoveSongInPlaylistButton(radio, db, playlist_id, song['path'], 1, "⬇️"))
+                controls.add_item(MoveSongInPlaylistButton(radio, db, playlist_id, song['path'], -1, Icons.MOVE_UP))
+                controls.add_item(MoveSongInPlaylistButton(radio, db, playlist_id, song['path'], 1, Icons.MOVE_DOWN))
                 controls.add_item(RemoveFromPlaylistButton(radio, db, playlist_id, song['path']))
                 
                 container.add_item(TextDisplay(info))
@@ -554,14 +561,14 @@ class PlaylistEditorView(discord.ui.LayoutView):
         container.add_item(TextDisplay(footer))
         
         nav_row = ActionRow()
-        prev_btn = discord.ui.Button(emoji="◀", style=discord.ButtonStyle.secondary, disabled=(page == 0))
+        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(page == 0))
         async def prev_callback(interaction):
             await interaction.response.defer()
             self.radio.last_editor_page -= 1
             await interaction.edit_original_response(view=PlaylistEditorView(radio, db, playlist_id, page=self.radio.last_editor_page))
         prev_btn.callback = prev_callback
         
-        next_btn = discord.ui.Button(emoji="▶", style=discord.ButtonStyle.secondary, disabled=(page >= total_pages - 1))
+        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(page >= total_pages - 1))
         async def next_callback(interaction):
             await interaction.response.defer()
             self.radio.last_editor_page += 1

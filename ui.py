@@ -26,7 +26,6 @@ def init_ui(_bot, _config, _radio, _db):
     init_views(bot, config)
 
 async def update_now_playing(song: dict):
-    print(f"[UI] Updating now playing. Current radio language: {radio.language}")
     channel = bot.get_channel(config.radio_text_channel_id)
     if not channel:
         return
@@ -147,8 +146,8 @@ async def refresh_all_uis():
         if radio.active_view_type == "history":
             from ui_views import HistoryView
             history = db.get_full_history(
-                limit=10, 
-                offset=radio.last_history_page * 10,
+                limit=radio.config.history_items_per_page, 
+                offset=radio.last_history_page * radio.config.history_items_per_page,
                 filter_from=radio.filter_from,
                 filter_to=radio.filter_to
             )

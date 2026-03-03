@@ -49,7 +49,7 @@ class RadioState:
 
     def refresh_queue(self):
         self.queue = []
-        for _ in range(11):
+        for _ in range(self.config.queue_refresh_limit):
             song = self.get_random_song_by_genre(self.genre)
             if song:
                 self.queue.append(song)
@@ -62,7 +62,7 @@ class RadioState:
 
     def get_random_song_by_genre(self, genre: str):
         if genre.lower() == "levifav":
-            return self.db.get_random_song_by_rating(min_rating=5)
+            return self.db.get_random_song_by_rating(min_rating=self.config.levifav_min_rating)
         return self.db.get_random_song_by_genre(genre)
 
     def get_display_queue(self):

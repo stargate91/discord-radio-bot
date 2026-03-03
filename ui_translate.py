@@ -1,8 +1,10 @@
+from ui_icons import Icons
+
 LOCALES = {
     "en": {
-        "system_sync": "💠 CONNECTION",
+        "system_sync": f"{Icons.SYNC} CONNECTION",
         "synchro_subtitle": "Select a channel to begin transmission.\n\"I'm everything you want to hear.\"",
-        "standby_mode": "🌌 STANDBY",
+        "standby_mode": f"{Icons.STANDBY} STANDBY",
         "standby_subtitle": "\"Everything you want to see. Everything you want to hear.\"\nPlease select a frequency to start the broadcast.",
         "now_playing": "NOW PLAYING",
         "paused": "PAUSED",
@@ -115,13 +117,14 @@ LOCALES = {
         "reset_radio_label": "Reset Radio",
         "radio_reset_feedback": "Radio reset to random mode.",
         "no_permission": "You do not have the required role to access this channel.",
+        "no_permission_general": "You do not have the required permissions for this action.",
         "playlist_studio_label": "Playlist Studio",
-        "playlist_studio_title": "🔧 PLAYLIST STUDIO",
+        "playlist_studio_title": f"{Icons.STUDIO} PLAYLIST STUDIO",
         "playlist_studio_subtitle": "Create and manage your custom playlists.",
         "new_playlist_label": "New Playlist",
         "delete_playlist_label": "Delete Playlist",
         "select_playlist_placeholder": "Select Playlist to Edit",
-        "playlist_editor_title": "📝 EDITING PLAYLIST",
+        "playlist_editor_title": f"{Icons.PLAYLIST} EDITING PLAYLIST",
         "save_exit_label": "Save & Exit",
         "create_playlist_modal_title": "Create New Playlist",
         "playlist_name_label": "Playlist Name",
@@ -132,9 +135,9 @@ LOCALES = {
         "rename_playlist_modal_title": "Rename Playlist"
     },
     "hu": {
-        "system_sync": "💠 CSATLAKOZÁS",
+        "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
         "synchro_subtitle": "Válasszon csatornát az adás megkezdéséhez.\n\"Én vagyok minden, amit hallani akarsz.\"",
-        "standby_mode": "🌌 KÉSZENLÉT",
+        "standby_mode": f"{Icons.STANDBY} KÉSZENLÉT",
         "standby_subtitle": "\"Minden, amit látni akarsz. Minden, amit hallani akarsz.\"\nVálasszon csatornát a sugárzás indításához.",
         "now_playing": "MOST SZÓL",
         "paused": "SZÜNETELTETVE",
@@ -245,13 +248,14 @@ LOCALES = {
         "reset_radio_label": "Rádió alaphelyzet",
         "radio_reset_feedback": "Rádió visszaállítva véletlenszerű módba.",
         "no_permission": "Nincs jogosultsága ehhez a csatornához a szükséges rang hiánya miatt.",
+        "no_permission_general": "Nincs jogosultsága ehhez a művelethez.",
         "playlist_studio_label": "Playlist Stúdió",
-        "playlist_studio_title": "🔧 PLAYLIST STÚDIÓ",
+        "playlist_studio_title": f"{Icons.STUDIO} PLAYLIST STÚDIÓ",
         "playlist_studio_subtitle": "Saját lejátszási listák kezelése és létrehozása.",
         "new_playlist_label": "Új lista",
         "delete_playlist_label": "Lista törlése",
         "select_playlist_placeholder": "Lista kiválasztása szerkesztésre",
-        "playlist_editor_title": "📝 LISTA SZERKESZTÉSE",
+        "playlist_editor_title": f"{Icons.PLAYLIST} LISTA SZERKESZTÉSE",
         "save_exit_label": "Mentés és kilépés",
         "create_playlist_modal_title": "Új lejátszási lista létrehozása",
         "playlist_name_label": "Lista neve",
@@ -269,15 +273,14 @@ _radio_ref = None
 def init_translate(radio_instance):
     global _radio_ref
     _radio_ref = radio_instance
-    print(f"[TRANSLATE] Module initialized with radio object (lang: {getattr(_radio_ref, 'language', 'N/A')})")
+
 
 def t(key):
     lang = "en"
     if _radio_ref:
         lang = getattr(_radio_ref, "language", "en")
     
-    print(f"[TRANSLATE] Resolving: {key} (Lang: {lang})")
-    
+
     current_locales = LOCALES.get(lang, LOCALES["en"])
     result = current_locales.get(key)
     

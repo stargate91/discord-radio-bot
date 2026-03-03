@@ -17,6 +17,7 @@ class Config:
         self.guild_id = int(data["guild_id"])
         self.voice_channel_id = int(data["voice_channel_id"])
         self.radio_text_channel_id = int(data["radio_text_channel_id"])
+        self.afk_channel_id = int(data.get("afk_channel_id", 0))
 
         self.default_genre = data["default_genre"]
         self.supported_extensions = set(
@@ -24,6 +25,22 @@ class Config:
         )
         self.genres = data.get("genres", {})
         self.ffmpeg_path = data.get("ffmpeg_path", "ffmpeg")
+        
+        # Roles and Permissions
+        self.admin_role_id = int(data.get("admin_role_id", 0))
+        self.restricted_channels = {
+            int(k): int(v) for k, v in data.get("restricted_channels", {}).items()
+        }
+        
+        # UI Settings
+        ui_settings = data.get("ui_settings", {})
+        self.search_items_per_page = ui_settings.get("search_items_per_page", 5)
+        self.history_items_per_page = ui_settings.get("history_items_per_page", 10)
+        self.queue_items_per_page = ui_settings.get("queue_items_per_page", 10)
+        self.playlist_items_per_page = ui_settings.get("playlist_items_per_page", 5)
+        self.queue_refresh_limit = ui_settings.get("queue_refresh_limit", 11)
+        self.player_upcoming_limit = ui_settings.get("player_upcoming_limit", 5)
+        self.levifav_min_rating = ui_settings.get("levifav_min_rating", 5)
 
         self.token = os.getenv("DISCORD_TOKEN")
 
