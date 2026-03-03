@@ -22,7 +22,7 @@ class StationSelect(discord.ui.Select):
         self.radio = radio
         options = [
             discord.SelectOption(
-                label=f"{Icons.UPLINK} {c.name}",
+                label=c.name,
                 value=str(c.id),
                 emoji=Icons.UPLINK
             ) for c in channels
@@ -74,7 +74,8 @@ class LanguageSelect(discord.ui.Select):
 class DisconnectButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=f"{Icons.STANDBY} {t('sever_uplink') or 'Sever Uplink'}",
+            label=t('sever_uplink') or 'Sever Uplink',
+            emoji=Icons.DISCONNECT,
             style=discord.ButtonStyle.secondary,
             custom_id="disconnect_button"
         )
@@ -411,7 +412,6 @@ class QueueToggleButton(discord.ui.Button):
             ephemeral=True
         )
 
-# Views
 class UnifiedStandbyView(LayoutView):
     def __init__(self, radio):
         super().__init__(timeout=None)
@@ -431,6 +431,7 @@ class UnifiedStandbyView(LayoutView):
             row_lang = ActionRow()
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
+            station_container.add_item(Separator())
             
             row_studio = ActionRow()
             from ui_studio import PlaylistStudioButton
@@ -462,6 +463,7 @@ class FrequencyStationView(LayoutView):
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
             
+            station_container.add_item(Separator())
             row_meta = ActionRow()
             row_meta.add_item(DisconnectButton(radio))
             station_container.add_item(row_meta)
@@ -469,9 +471,9 @@ class FrequencyStationView(LayoutView):
         self.add_item(station_container)
 
 class NowPlayingView(LayoutView):
-    def __init__(self, radio, db):
+    def __init__(self, radio, db, song=None, cover_path=None):
         super().__init__(timeout=None)
-        song = radio.current_song or {}
+        song = song or radio.current_song or {}
 
         accent_color = Theme.PLAYING
         status_key = "now_playing"
@@ -488,7 +490,10 @@ class NowPlayingView(LayoutView):
 
         master_container = Container(accent_color=accent_color)
         
-        cover_path = db.get_song_cover_path(song.get("path", ""))
+        # We use the explicitly passed cover_path if available
+        if cover_path is None:
+            cover_path = db.get_song_cover_path(song.get("path", ""))
+            
         thumb = None
         if cover_path and Path(cover_path).exists():
             thumb = Thumbnail(f"attachment://cover.png")

@@ -478,11 +478,20 @@ class DatabaseManager:
             conn.commit()
             return cursor.lastrowid
 
-    def get_all_playlists(self) -> list[dict]:
+    def get_all_playlists(self, user_id: int | None = None, strictly_personal: bool = False) -> list[dict]:
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM playlists ORDER BY name ASC")
+            if strictly_personal and user_id:
+                cursor.execute("SELECT * FROM playlists WHERE user_id = ? ORDER BY name ASC", (user_id,))
+            elif user_id:
+                # Order by: first own playlists (0), then others (1). Within those, alphabetical by name.
+                cursor.execute("""
+                    SELECT * FROM playlists 
+                    ORDER BY (CASE WHEN user_id = ? THEN 0 ELSE 1 END) ASC, name ASC
+                """, (user_id,))
+            else:
+                cursor.execute("SELECT * FROM playlists ORDER BY name ASC")
             return [dict(row) for row in cursor.fetchall()]
 
     def get_playlist_songs(self, playlist_id: int) -> list[dict]:

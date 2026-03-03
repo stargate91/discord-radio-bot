@@ -7,6 +7,16 @@ from ui_utils import fixed, format_duration
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from ui_theme import Theme
 
+async def check_editor_lock(radio, interaction):
+    if radio.playlist_editor_user and radio.playlist_editor_user != interaction.user.id:
+        try:
+            member = await interaction.guild.fetch_member(radio.playlist_editor_user)
+            name = member.display_name
+        except: name = "Someone"
+        await interaction.response.send_message(t("studio_locked_message").format(user=name), ephemeral=True)
+        return True
+    return False
+
 class SearchButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
@@ -18,6 +28,8 @@ class SearchButton(discord.ui.Button):
         self.db = db
 
     async def callback(self, interaction: discord.Interaction):
+        if self.radio.editing_playlist_id:
+            if await check_editor_lock(self.radio, interaction): return
         modal = SearchModal(self.radio, self.db)
         await interaction.response.send_modal(modal)
 
@@ -77,8 +89,9 @@ class AddSongButton(discord.ui.Button):
         self.song = song
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
         if self.radio.editing_playlist_id:
+            if await check_editor_lock(self.radio, interaction): return
+            await interaction.response.defer(ephemeral=True)
             from database import DatabaseManager
             db = DatabaseManager()
             db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
@@ -98,6 +111,7 @@ class AddSongButton(discord.ui.Button):
                 except Exception as e:
                     print(f"DEBUG: Refresh failed: {e}")
         else:
+            await interaction.response.defer(ephemeral=True)
             self.radio.dispatch(RadioAction.ADD_TO_QUEUE, self.song, user=interaction.user)
             await interaction.followup.send(f"{t('add_to_queue')} **{self.song['artist']} - {self.song['title']}**", ephemeral=True)
 
@@ -112,6 +126,8 @@ class TabButton(discord.ui.Button):
         self.user = user
 
     async def callback(self, interaction: discord.Interaction):
+        if self.radio.editing_playlist_id:
+            if await check_editor_lock(self.radio, interaction): return
         from ui import init_translate
         init_translate(self.radio)
         await interaction.response.defer()
@@ -120,7 +136,7 @@ class TabButton(discord.ui.Button):
         if self.search_type == "songs": results = self.db.search_songs(self.query)
         elif self.search_type == "artists": results = self.db.search_artists(self.query)
         elif self.search_type == "albums": results = self.db.search_albums(self.query)
-        elif self.search_type == "playlists": results = self.db.get_all_playlists()
+        elif self.search_type == "playlists": results = self.db.get_all_playlists(self.user.id)
             
         view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type)
         await interaction.edit_original_response(view=view)
@@ -136,6 +152,8 @@ class SearchBySelectionButton(discord.ui.Button):
         self.original_query = original_query
 
     async def callback(self, interaction: discord.Interaction):
+        if self.radio.editing_playlist_id:
+            if await check_editor_lock(self.radio, interaction): return
         from ui import init_translate
         init_translate(self.radio)
         await interaction.response.defer()
@@ -156,18 +174,22 @@ class SearchBySelectionButton(discord.ui.Button):
 
 class QueueAllButton(discord.ui.Button):
     def __init__(self, radio, songs):
-        super().__init__(label=t("queue_all"), style=discord.ButtonStyle.secondary, custom_id="queue_all_button")
+        label = t("add_all") if radio.editing_playlist_id else t("queue_all")
+        super().__init__(label=label, style=discord.ButtonStyle.secondary, custom_id="queue_all_button")
         self.radio = radio
         self.songs = songs
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
+        from ui import init_translate
+        init_translate(self.radio)
         if self.radio.editing_playlist_id:
+            if await check_editor_lock(self.radio, interaction): return
+            await interaction.response.defer(ephemeral=True)
             from database import DatabaseManager
             db = DatabaseManager()
             for song in self.songs:
                 db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
-            await interaction.followup.send(f"{t('bulk_added_to_playlist').format(count=len(self.songs))}", ephemeral=True)
+            await interaction.followup.send(t('bulk_added_to_playlist').format(count=len(self.songs)), ephemeral=True)
             
             search_id = self.radio.embed_manager.load_message_id("search")
             if search_id:
@@ -182,9 +204,10 @@ class QueueAllButton(discord.ui.Button):
                         await msg.edit(view=view)
                 except: pass
         else:
+            await interaction.response.defer(ephemeral=True)
             for song in self.songs:
                 self.radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
-            await interaction.followup.send(f"{t('bulk_added_to_queue').format(count=len(self.songs))}", ephemeral=True)
+            await interaction.followup.send(t('bulk_added_to_queue').format(count=len(self.songs)), ephemeral=True)
 
 class QueueViewButton(discord.ui.Button):
     def __init__(self, radio):
@@ -249,6 +272,8 @@ class SearchResultsView(LayoutView):
         
         close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
         async def close_callback(interaction):
+             if self.radio.editing_playlist_id:
+                 if await check_editor_lock(self.radio, interaction): return
              await interaction.response.defer()
              from ui import embed_state
              embed_state.save_message_id("search", None)
@@ -289,7 +314,9 @@ class SearchResultsView(LayoutView):
                     album_info = f"**{i}. {item['album']}** {item['artist']}"
                     container.add_item(Section(album_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "album_songs", (item['artist'], item['album']), user, original_query=self.original_query)))
                 elif self.search_type == "playlists":
-                    playlist_info = f"**{i}. {item['name']}**"
+                    is_owned = item.get('user_id') == self.user.id
+                    prefix = f"{Icons.USER} " if is_owned else ""
+                    playlist_info = f"**{i}. {prefix}{item['name']}**"
                     container.add_item(Section(playlist_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "playlist_songs", item['id'], user, original_query=self.original_query)))
 
         container.add_item(Separator())

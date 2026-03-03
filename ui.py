@@ -66,34 +66,48 @@ async def update_now_playing(song: dict):
         radio.station_message = await channel.send(view=station_view)
     embed_state.save_message_id("station", radio.station_message.id)
 
-    player_view = NowPlayingView(radio, db)
+    # 1. Handle Cover Image
+    file = None
+    cover_path = None
+    song_path = song.get("path")
+    
+    if song_path:
+        cover_path = db.get_song_cover_path(song_path)
+        if not cover_path or not Path(cover_path).exists():
+            temp_path = find_and_save_cover(Path(song_path), db)
+            if temp_path:
+                db.save_song_cover_path(song_path, temp_path)
+                cover_path = temp_path
+
+    if cover_path and Path(cover_path).exists():
+        file = discord.File(cover_path, filename="cover.png")
+
+    # 2. Create View with synchronized data
+    player_view = NowPlayingView(radio, db, song=song, cover_path=cover_path)
+    
     if not radio.now_playing_message:
         msg_id = embed_state.load_message_id("player")
         if msg_id:
             try: radio.now_playing_message = await channel.fetch_message(msg_id)
             except: radio.now_playing_message = None
 
-    file = None
-    cover_path = db.get_song_cover_path(song.get("path", ""))
-    if cover_path and Path(cover_path).exists():
-        file = discord.File(cover_path, filename="cover.png")
-    else:
-        temp_path = find_and_save_cover(Path(song.get("path", "")), db)
-        if temp_path:
-            db.save_song_cover_path(song.get("path", ""), temp_path)
-            file = discord.File(temp_path, filename="cover.png")
-
     if radio.now_playing_message:
         try:
+            # We must create a NEW file object for the retry send if edit fails!
             await radio.now_playing_message.edit(
                 embed=None,
                 view=player_view,
                 attachments=[file] if file else []
             )
-        except:
-            radio.now_playing_message = await channel.send(view=player_view, file=file)
+        except Exception as e:
+            # If edit fails, retry with a fresh file object (file handles can only be read once)
+            retry_file = None
+            if cover_path and Path(cover_path).exists():
+                retry_file = discord.File(cover_path, filename="cover.png")
+            radio.now_playing_message = await channel.send(view=player_view, file=retry_file)
     else:
         radio.now_playing_message = await channel.send(view=player_view, file=file)
+    
     embed_state.save_message_id("player", radio.now_playing_message.id)
 
     if radio.active_view_type == "queue":

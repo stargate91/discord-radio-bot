@@ -7,6 +7,16 @@ from ui_utils import fixed, format_duration
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from ui_theme import Theme
 
+async def check_editor_lock(radio, interaction):
+    if radio.playlist_editor_user and radio.playlist_editor_user != interaction.user.id:
+        try:
+            member = await interaction.guild.fetch_member(radio.playlist_editor_user)
+            name = member.display_name
+        except: name = "Someone"
+        await interaction.response.send_message(t("studio_locked_message").format(user=name), ephemeral=True)
+        return True
+    return False
+
 class PlaylistViewButton(discord.ui.Button):
     def __init__(self, radio, db):
         super().__init__(
@@ -22,7 +32,7 @@ class PlaylistViewButton(discord.ui.Button):
         from ui import embed_state
         await interaction.response.defer()
         
-        playlists = self.db.get_all_playlists()
+        playlists = self.db.get_all_playlists(interaction.user.id)
         self.radio.active_view_type = "search"
         self.radio.last_search_query = ""
         self.radio.last_search_results = playlists
@@ -43,7 +53,12 @@ class PlaylistViewButton(discord.ui.Button):
 
 class PlaylistStudioButton(discord.ui.Button):
     def __init__(self, radio):
-        super().__init__(label=f"{Icons.STUDIO} {t('playlist_studio_label')}", style=discord.ButtonStyle.secondary, custom_id="playlist_studio_button")
+        super().__init__(
+            label=t("playlist_studio_label"), 
+            style=discord.ButtonStyle.secondary, 
+            emoji=Icons.STUDIO,
+            custom_id="playlist_studio_button"
+        )
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
@@ -78,10 +93,17 @@ class PlaylistSelect(discord.ui.Select):
     def __init__(self, radio, db, playlists):
         self.radio = radio
         self.db = db
-        options = [discord.SelectOption(label=p['name'], value=str(p['id']), emoji=Icons.PLAYLIST) for p in playlists]
+        options = []
+        for p in playlists:
+            options.append(discord.SelectOption(
+                label=p['name'], 
+                value=str(p['id']), 
+                emoji=Icons.PLAYLIST
+            ))
         super().__init__(placeholder=t("select_playlist_placeholder"), options=options, custom_id="playlist_select")
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer()
         playlist_id = int(self.values[0])
         self.radio.editing_playlist_id = playlist_id
@@ -90,11 +112,12 @@ class PlaylistSelect(discord.ui.Select):
 
 class NewPlaylistButton(discord.ui.Button):
     def __init__(self, radio, db):
-        super().__init__(label=t("new_playlist_label"), style=discord.ButtonStyle.primary, emoji=Icons.ADD)
+        super().__init__(label=t("new_playlist_label"), style=discord.ButtonStyle.secondary, emoji=Icons.ADD)
         self.radio = radio
         self.db = db
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.send_modal(NewPlaylistModal(self.radio, self.db))
 
 class NewPlaylistModal(Modal):
@@ -123,6 +146,7 @@ class RemoveFromPlaylistButton(discord.ui.Button):
         self.song_path = song_path
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer()
         self.db.remove_song_from_playlist(self.playlist_id, self.song_path)
         await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, self.playlist_id, page=self.radio.last_editor_page))
@@ -135,10 +159,7 @@ class DeletePlaylistButton(discord.ui.Button):
         self.playlist_id = playlist_id
 
     async def callback(self, interaction: discord.Interaction):
-        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
-        if self.radio.config.admin_role_id not in user_role_ids:
-            await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
-            return
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer(ephemeral=True)
         self.db.delete_playlist(self.playlist_id)
         self.radio.editing_playlist_id = None
@@ -151,6 +172,7 @@ class ExitStudioButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer()
         self.radio.editing_playlist_id = None
         self.radio.playlist_editor_user = None
@@ -166,6 +188,7 @@ class RenamePlaylistButton(discord.ui.Button):
         self.playlist_id = playlist_id
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.send_modal(RenamePlaylistModal(self.radio, self.db, self.playlist_id))
 
 class RenamePlaylistModal(Modal):
@@ -194,6 +217,7 @@ class MoveSongInPlaylistButton(discord.ui.Button):
         self.direction = direction
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer()
         self.db.move_song_in_playlist(self.playlist_id, self.song_path, self.direction)
         await interaction.edit_original_response(view=PlaylistEditorView(self.radio, self.db, self.playlist_id, page=self.radio.last_editor_page))
@@ -204,6 +228,7 @@ class BackToEditorButton(discord.ui.Button):
         self.radio = radio
 
     async def callback(self, interaction: discord.Interaction):
+        if await check_editor_lock(self.radio, interaction): return
         await interaction.response.defer()
         from database import DatabaseManager
         db = DatabaseManager()
@@ -312,7 +337,7 @@ class PlaylistStudioView(LayoutView):
         self.db = db
         container = Container(accent_color=Theme.BACKGROUND)
         container.add_item(TextDisplay(f"## {t('playlist_studio_title')}\n{t('playlist_studio_subtitle')}"))
-        playlists = db.get_all_playlists()
+        playlists = db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
         if playlists:
             row_select = ActionRow()
             row_select.add_item(PlaylistSelect(radio, db, playlists))
@@ -337,7 +362,7 @@ class PlaylistEditorView(LayoutView):
         total_duration = sum(s.get('duration', 0) for s in songs)
         duration_str = format_duration(total_duration)
         container = Container(accent_color=Theme.PRIMARY)
-        playlists = db.get_all_playlists()
+        playlists = db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
         playlist_name = next((p['name'] for p in playlists if p['id'] == playlist_id), "Unknown")
         container.add_item(TextDisplay(f"## {t('playlist_editor_title')}: {playlist_name}"))
         if not songs:
@@ -360,12 +385,14 @@ class PlaylistEditorView(LayoutView):
         nav_row = ActionRow()
         prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(page == 0))
         async def prev_callback(interaction):
+            if await check_editor_lock(self.radio, interaction): return
             await interaction.response.defer()
             self.radio.last_editor_page -= 1
             await interaction.edit_original_response(view=PlaylistEditorView(radio, db, playlist_id, page=self.radio.last_editor_page))
         prev_btn.callback = prev_callback
         next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(page >= total_pages - 1))
         async def next_callback(interaction):
+            if await check_editor_lock(self.radio, interaction): return
             await interaction.response.defer()
             self.radio.last_editor_page += 1
             await interaction.edit_original_response(view=PlaylistEditorView(radio, db, playlist_id, page=self.radio.last_editor_page))

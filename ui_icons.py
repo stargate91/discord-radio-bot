@@ -5,7 +5,8 @@ class Icons:
     FIRST = "⏪"
     LAST = "⏩"
     BACK = "🔙"
-    EXIT = "🚪"
+    EXIT = "<:logout:1478260565230223481>"
+    DISCONNECT = "<:unplug:1478251603848069251>"
     CLOSE = "✖️"
     
     # Playback Controls
@@ -33,9 +34,9 @@ class Icons:
     QUEUE = "📋"
     
     # Playlist Studio
-    STUDIO = "🛠️"
+    STUDIO = "<:blocks:1478234138271285248>"
     PLAYLIST = "📝"
-    ADD = "➕"
+    ADD = "<:plus:1478259626213638194>"
     REMOVE = "🗑️"
     MOVE_UP = "⬆️"
     MOVE_DOWN = "⬇️"
@@ -43,20 +44,20 @@ class Icons:
     RENAME = "✏️"
     STATUS = "📌"
     IMPORT = "📥"
-    WARNING = "⚠️"
+    WARNING = "<:trianglealert:1478266385212641421>"
     
     # Interaction
     LIKE = "❤️"
     DISLIKE = "👎"
     
     # System & States
-    SYNC = "💠"
-    STANDBY = "🌌"
+    SYNC = "<a:musicplay:1478239850355228754>"
+    STANDBY = "<a:trailloading:1478249295680503939>"
     UPLINK = "📡"
     USER = "👂"
     HEADPHONES = "🎧"
     LOCATION = "📍"
     
     # Language Flags
-    LANG_EN = "🇺🇸"
+    LANG_EN = "🇬🇧"
     LANG_HU = "🇭🇺"

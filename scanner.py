@@ -7,6 +7,8 @@ from mutagen.flac import FLAC, Picture
 import hashlib
 
 def get_cover_art(file_path: Path) -> bytes | None:
+    if not file_path.is_file():
+        return None
     folder = file_path.parent
     cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
     
