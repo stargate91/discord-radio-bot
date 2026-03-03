@@ -18,12 +18,24 @@
     "ffmpeg_path": "ffmpeg",
     "ui_settings": {
         "search_items_per_page": 5,
-        "history_items_per_page": 10,
-        "queue_items_per_page": 10,
+        "history_items_per_page": 5,
+        "queue_items_per_page": 5,
         "playlist_items_per_page": 5,
         "queue_refresh_limit": 11,
         "player_upcoming_limit": 5,
-        "levifav_min_rating": 5
+        "levifav_min_rating": 5,
+        "theme": {
+            "primary": "0x5865F2",
+            "secondary": "0x2b2d31",
+            "success": "0x5865F2",
+            "warning": "0xFEE75C",
+            "danger": "0xED4245",
+            "idle": "0xED4245",
+            "paused": "0xFEE75C",
+            "playing": "0x5865F2",
+            "background": "0x2b2d31",
+            "accent": "0x5865F2"
+        }
     },
     "genres": {
         "Electronic": [

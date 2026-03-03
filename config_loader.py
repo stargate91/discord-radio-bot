@@ -37,12 +37,25 @@ class Config:
         # UI Settings
         ui_settings = data.get("ui_settings", {})
         self.search_items_per_page = ui_settings.get("search_items_per_page", 5)
-        self.history_items_per_page = ui_settings.get("history_items_per_page", 10)
-        self.queue_items_per_page = ui_settings.get("queue_items_per_page", 10)
+        self.history_items_per_page = ui_settings.get("history_items_per_page", 5)
+        self.queue_items_per_page = ui_settings.get("queue_items_per_page", 5)
         self.playlist_items_per_page = ui_settings.get("playlist_items_per_page", 5)
         self.queue_refresh_limit = ui_settings.get("queue_refresh_limit", 11)
         self.player_upcoming_limit = ui_settings.get("player_upcoming_limit", 5)
         self.levifav_min_rating = ui_settings.get("levifav_min_rating", 5)
+        
+        # Theme Settings
+        theme_data = ui_settings.get("theme", {})
+        self.theme_primary = int(theme_data.get("primary", "0x5865F2"), 16)
+        self.theme_secondary = int(theme_data.get("secondary", "0x2b2d31"), 16)
+        self.theme_success = int(theme_data.get("success", "0x5865F2"), 16)
+        self.theme_warning = int(theme_data.get("warning", "0xFEE75C"), 16)
+        self.theme_danger = int(theme_data.get("danger", "0xED4245"), 16)
+        self.theme_idle = int(theme_data.get("idle", "0xED4245"), 16)
+        self.theme_paused = int(theme_data.get("paused", "0xFEE75C"), 16)
+        self.theme_playing = int(theme_data.get("playing", "0x5865F2"), 16)
+        self.theme_background = int(theme_data.get("background", "0x2b2d31"), 16)
+        self.theme_accent = int(theme_data.get("accent", "0x5865F2"), 16)
 
         self.token = os.getenv("DISCORD_TOKEN")
 

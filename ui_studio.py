@@ -54,7 +54,7 @@ class PlaylistViewButton(discord.ui.Button):
 class PlaylistStudioButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(
-            label=None if radio.is_compact else t("playlist_studio_label"), 
+            label=t("playlist_studio_label"), 
             style=discord.ButtonStyle.secondary, 
             emoji=Icons.STUDIO,
             custom_id="playlist_studio_button"
@@ -250,13 +250,15 @@ class HistoryButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         from ui import embed_state
         await interaction.response.defer()
-        history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0)
+        # Use config limit (defaulting to 5) to prevent UI overflow
+        limit = self.radio.config.history_items_per_page
+        history = self.db.get_full_history(limit=limit, offset=0)
         total_count = self.db.get_history_count()
         self.radio.active_view_type = "history"
         self.radio.last_history_page = 0
         self.radio.filter_from = None
         self.radio.filter_to = None
-        view = HistoryView(self.radio, self.db, history, total_count, page=0)
+        view = HistoryView(self.radio, self.db, history, total_count, page=0, user=interaction.user)
         search_id = embed_state.load_message_id("search")
         if search_id:
             try:
@@ -281,9 +283,10 @@ class HistoryFilterButton(discord.ui.Button):
         if self.radio.filter_from or self.radio.filter_to:
             self.radio.filter_from = None
             self.radio.filter_to = None
-            history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0)
+            limit = self.radio.config.history_items_per_page
+            history = self.db.get_full_history(limit=limit, offset=0)
             total_count = self.db.get_history_count()
-            view = HistoryView(self.radio, self.db, history, total_count, page=0)
+            view = HistoryView(self.radio, self.db, history, total_count, page=0, user=interaction.user)
             await interaction.response.edit_message(view=view)
         else:
             await interaction.response.send_modal(HistoryFilterModal(self.radio, self.db))
@@ -314,9 +317,10 @@ class HistoryFilterModal(discord.ui.Modal):
         self.radio.filter_from = f_from
         self.radio.filter_to = f_to
         await interaction.response.defer()
-        history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0, filter_from=f_from, filter_to=f_to)
+        limit = self.radio.config.history_items_per_page
+        history = self.db.get_full_history(limit=limit, offset=0, filter_from=f_from, filter_to=f_to)
         total_count = self.db.get_history_count(filter_from=f_from, filter_to=f_to)
-        view = HistoryView(self.radio, self.db, history, total_count, page=0)
+        view = HistoryView(self.radio, self.db, history, total_count, page=0, user=interaction.user)
         await interaction.edit_original_response(view=view)
 
 class DeleteHistoryButton(discord.ui.Button):
@@ -330,9 +334,10 @@ class DeleteHistoryButton(discord.ui.Button):
             await interaction.response.send_message(t("no_permission_general"), ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
         self.db.clear_history()
-        history = self.db.get_full_history(limit=self.radio.config.history_items_per_page, offset=0)
+        limit = self.radio.config.history_items_per_page
+        history = self.db.get_full_history(limit=limit, offset=0)
         total_count = self.db.get_history_count()
-        view = HistoryView(self.radio, self.db, history, total_count, page=0)
+        view = HistoryView(self.radio, self.db, history, total_count, page=0, user=interaction.user)
         await interaction.edit_original_response(view=view)
         await interaction.followup.send(t("history_cleared"), ephemeral=True)
 
@@ -421,13 +426,14 @@ class PlaylistEditorView(LayoutView):
         self.add_item(container)
 
 class HistoryView(LayoutView):
-    def __init__(self, radio, db, history, total_count, page=0):
+    def __init__(self, radio, db, history, total_count, page=0, user=None):
         super().__init__(timeout=None)
         self.radio = radio
         self.db = db
         self.history = history
         self.total_count = total_count
         self.page = page
+        self.user = user or radio.last_user
         self.items_per_page = radio.config.history_items_per_page
         self.total_pages = (total_count + self.items_per_page - 1) // self.items_per_page
         self.update_view_all()
@@ -435,13 +441,48 @@ class HistoryView(LayoutView):
     def update_view_all(self):
         self.clear_items()
         container = Container(accent_color=Theme.BACKGROUND)
+
+        close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
+        async def close_callback(interaction):
+            await interaction.response.defer()
+            from ui import embed_state
+            embed_state.save_message_id("search", None)
+            self.radio.active_view_type = None
+            try: await interaction.delete_original_response()
+            except:
+                try: await interaction.message.delete()
+                except: pass
+        close_btn.callback = close_callback
+
+        ctrl_row = ActionRow()
+        ctrl_row.add_item(HistoryFilterButton(self.radio, self.db))
+        ctrl_row.add_item(DeleteHistoryButton(self.radio, self.db))
+        ctrl_row.add_item(close_btn)
+        container.add_item(ctrl_row)
+        container.add_item(Separator())
+
+        if self.radio.filter_from or self.radio.filter_to:
+            filter_text = f"{Icons.LOCATION} {t('filter_label')}: "
+            if self.radio.filter_from: filter_text += f"{t('filter_from_label').split(' ')[0]} {self.radio.filter_from} "
+            if self.radio.filter_to: filter_text += f"{t('filter_to_label').split(' ')[0]} {self.radio.filter_to}"
+            container.add_item(TextDisplay(f"*{filter_text}*"))
+            container.add_item(Separator())
+
         if not self.history:
             container.add_item(TextDisplay(f"*{t('empty')}*"))
         else:
             from datetime import datetime
             date_fmt = t("date_format")
             from ui_search import AddSongButton
-            for i, item in enumerate(self.history, (self.page * self.items_per_page) + 1):
+            
+            # Slice history to ensure we only show the current page's items
+            # (though refresh_data already handles this, the initial load might not)
+            start_idx = self.page * self.items_per_page
+            page_history = self.history
+            if len(self.history) > self.items_per_page:
+                page_history = self.history[0:self.items_per_page] # In refresh_data it's already a single page
+
+            for i, item in enumerate(page_history, start_idx + 1):
                 timestamp = item.get('played_at', '')
                 try:
                     if isinstance(timestamp, (int, float)): time_str = datetime.fromtimestamp(timestamp).strftime(date_fmt)
@@ -451,6 +492,13 @@ class HistoryView(LayoutView):
                 except: time_str = str(timestamp)
                 song_info = f"**{i}. {item['title']}** {item['artist']}\n*({t('played_at')} {time_str})*"
                 container.add_item(Section(song_info, accessory=AddSongButton(self.radio, item)))
+        
+        container.add_item(Separator())
+        footer_text = f"{t('page')} {self.page + 1}/{self.total_pages} • {self.total_count} {t('results')}"
+        if self.user:
+            footer_text += f" • {t('initiated_by')} {self.user.mention}"
+        container.add_item(TextDisplay(footer_text))
+        
         container.add_item(Separator())
         nav_row = ActionRow()
         prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
@@ -471,31 +519,11 @@ class HistoryView(LayoutView):
             self.page = self.total_pages - 1
             await self.refresh_data(interaction)
         last_btn.callback = last_callback
-        close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
-        async def close_callback(interaction):
-            await interaction.response.defer()
-            from ui import embed_state
-            embed_state.save_message_id("search", None)
-            self.radio.active_view_type = None
-            try: await interaction.delete_original_response()
-            except:
-                try: await interaction.message.delete()
-                except: pass
-        close_btn.callback = close_callback
+        
         nav_row.add_item(prev_btn)
         nav_row.add_item(next_btn)
         nav_row.add_item(last_btn)
         container.add_item(nav_row)
-        ctrl_row = ActionRow()
-        ctrl_row.add_item(HistoryFilterButton(self.radio, self.db))
-        ctrl_row.add_item(DeleteHistoryButton(self.radio, self.db))
-        ctrl_row.add_item(close_btn)
-        container.add_item(ctrl_row)
-        if self.radio.filter_from or self.radio.filter_to:
-            filter_text = f"{Icons.LOCATION} {t('filter_label')}: "
-            if self.radio.filter_from: filter_text += f"{t('filter_from_label').split(' ')[0]} {self.radio.filter_from} "
-            if self.radio.filter_to: filter_text += f"{t('filter_to_label').split(' ')[0]} {self.radio.filter_to}"
-            container.add_item(TextDisplay(f"*{filter_text}*"))
         self.add_item(container)
 
     async def refresh_data(self, interaction):

@@ -281,6 +281,7 @@ class SearchResultsView(LayoutView):
         close_btn.callback = close_callback
         tab_row.add_item(close_btn)
         container.add_item(tab_row)
+        container.add_item(Separator())
 
         if self.radio.editing_playlist_id:
             playlists = self.db.get_all_playlists()
@@ -355,6 +356,30 @@ class SearchResultsView(LayoutView):
         new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type, original_query=self.original_query)
         await interaction.edit_original_response(view=new_view)
 
+class MoveSongInQueueButton(discord.ui.Button):
+    def __init__(self, radio, song, direction, emoji):
+        import random, string
+        unique = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+        super().__init__(emoji=emoji, style=discord.ButtonStyle.secondary, custom_id=f"q_move_{direction}_{unique}")
+        self.radio = radio
+        self.song = song
+        self.direction = direction
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        try:
+            curr_idx = self.radio.queue.index(self.song)
+            new_idx = curr_idx + self.direction
+            if 0 <= new_idx < len(self.radio.queue):
+                # Move item
+                item = self.radio.queue.pop(curr_idx)
+                self.radio.queue.insert(new_idx, item)
+                
+                # Refresh view
+                from ui import refresh_all_uis
+                await refresh_all_uis()
+        except: pass
+
 class FullQueueView(LayoutView):
     def __init__(self, radio, page=0):
         super().__init__(timeout=None)
@@ -373,7 +398,12 @@ class FullQueueView(LayoutView):
             page_results = self.queue_list[start:end]
             for i, song in enumerate(page_results, start + 1):
                 song_info = f"**{i}. {song['artist']} - {song['title']}**"
-                container.add_item(Section(song_info, accessory=RemoveFromQueueButton(radio, song)))
+                row = ActionRow()
+                row.add_item(MoveSongInQueueButton(radio, song, -1, Icons.MOVE_UP))
+                row.add_item(MoveSongInQueueButton(radio, song, 1, Icons.MOVE_DOWN))
+                row.add_item(RemoveFromQueueButton(radio, song))
+                container.add_item(TextDisplay(song_info))
+                container.add_item(row)
         
         container.add_item(Separator())
         footer = f"{t('page')} {self.page + 1}/{self.total_pages} • {len(self.queue_list)} {t('songs')}"
@@ -394,6 +424,13 @@ class FullQueueView(LayoutView):
             await self.refresh_view(interaction)
         next_btn.callback = next_callback
         
+        last_btn = discord.ui.Button(label=t("last_label"), style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        async def last_callback(interaction):
+            await interaction.response.defer()
+            self.page = self.total_pages - 1
+            await self.refresh_view(interaction)
+        last_btn.callback = last_callback
+        
         close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
         async def close_callback(interaction):
             await interaction.response.defer()
@@ -406,10 +443,12 @@ class FullQueueView(LayoutView):
         
         nav_row.add_item(prev_btn)
         nav_row.add_item(next_btn)
+        nav_row.add_item(last_btn)
         nav_row.add_item(close_btn)
         container.add_item(nav_row)
         self.add_item(container)
 
     async def refresh_view(self, interaction):
+        self.radio.last_queue_page = self.page
         new_view = FullQueueView(self.radio, page=self.page)
         await interaction.edit_original_response(view=new_view)

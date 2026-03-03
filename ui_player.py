@@ -521,10 +521,7 @@ class NowPlayingView(LayoutView):
 
         master_container = Container(accent_color=accent_color)
         
-        # We use the explicitly passed cover_path if available
-        if cover_path is None:
-            cover_path = db.get_song_cover_path(song.get("path", ""))
-            
+        # Use the provided cover_path; do not perform redundant DB lookups here
         thumb = None
         if cover_path and Path(cover_path).exists():
             thumb = Thumbnail(f"attachment://cover.png")
@@ -580,9 +577,11 @@ class NowPlayingView(LayoutView):
         else:
             master_container.add_item(TextDisplay(info_text))
 
+        master_container.add_item(Separator())
         genre_row = ActionRow()
         genre_row.add_item(GenreSelect(radio, db))
         master_container.add_item(genre_row)
+        master_container.add_item(Separator())
 
         playback_row = ActionRow()
         playback_row.add_item(BackButton(radio, db))

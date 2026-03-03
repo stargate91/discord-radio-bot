@@ -22,6 +22,8 @@ def init_ui(_bot, _config, _radio, _db):
     db = _db
     
     init_translate(radio)
+    from ui_theme import Theme
+    Theme.init_theme(config)
     init_player_ui(bot, config, update_now_playing)
 
 async def update_now_playing(song: dict):
@@ -78,11 +80,17 @@ async def update_now_playing(song: dict):
                 db.save_song_cover_path(song_path, temp_path)
                 cover_path = temp_path
 
-    if cover_path and Path(cover_path).exists():
-        file = discord.File(cover_path, filename="cover.png")
+    valid_file = False
+    if cover_path and Path(cover_path).exists() and Path(cover_path).is_file():
+        try:
+            file = discord.File(str(cover_path), filename="cover.png")
+            valid_file = True
+        except:
+            file = None
 
     # 2. Create View with synchronized data
-    player_view = NowPlayingView(radio, db, song=song, cover_path=cover_path)
+    # Only pass cover_path if we actually have a file to attach
+    player_view = NowPlayingView(radio, db, song=song, cover_path=cover_path if valid_file else None)
     
     if not radio.now_playing_message:
         msg_id = embed_state.load_message_id("player")
@@ -154,9 +162,11 @@ async def refresh_all_uis():
     try:
         msg = await channel.fetch_message(search_id)
         if radio.active_view_type == "history":
+            # Use fixed limit 5 to match HistoryView.items_per_page
+            limit = 5
             history = db.get_full_history(
-                limit=radio.config.history_items_per_page, 
-                offset=radio.last_history_page * radio.config.history_items_per_page,
+                limit=limit, 
+                offset=radio.last_history_page * limit,
                 filter_from=radio.filter_from,
                 filter_to=radio.filter_to
             )
@@ -172,5 +182,7 @@ async def refresh_all_uis():
             await msg.edit(view=PlaylistStudioView(radio, db))
         elif radio.active_view_type == "playlist_editor" and radio.editing_playlist_id:
             await msg.edit(view=PlaylistEditorView(radio, db, radio.editing_playlist_id, page=radio.last_editor_page))
+        elif radio.active_view_type == "queue":
+            await msg.edit(view=FullQueueView(radio, page=radio.last_queue_page))
     except:
         pass
