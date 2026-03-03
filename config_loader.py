@@ -20,6 +20,7 @@ class Config:
         self.afk_channel_id = int(data.get("afk_channel_id", 0))
 
         self.default_genre = data["default_genre"]
+        self.default_language = data.get("default_language", "en")
         self.supported_extensions = set(
             data.get("supported_extensions", [])
         )

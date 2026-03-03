@@ -4,8 +4,9 @@ from embed_state import EmbedStateManager
 from scanner import find_and_save_cover
 from ui_translate import t, init_translate
 from ui_utils import format_duration, fixed
-from ui_components import init_components
-from ui_views import UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_views
+from ui_player import UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_player_ui
+from ui_search import SearchResultsView, FullQueueView
+from ui_studio import PlaylistStudioView, PlaylistEditorView, HistoryView
 
 embed_state = EmbedStateManager()
 
@@ -22,8 +23,7 @@ def init_ui(_bot, _config, _radio, _db):
     db = _db
     
     init_translate(radio)
-    init_components(update_now_playing)
-    init_views(bot, config)
+    init_player_ui(bot, config, update_now_playing)
 
 async def update_now_playing(song: dict):
     channel = bot.get_channel(config.radio_text_channel_id)
@@ -101,7 +101,6 @@ async def update_now_playing(song: dict):
         if search_id:
             try:
                 msg = await channel.fetch_message(search_id)
-                from ui_views import FullQueueView
                 await msg.edit(view=FullQueueView(radio, page=radio.last_queue_page))
             except: pass
 
@@ -144,7 +143,6 @@ async def refresh_all_uis():
     try:
         msg = await channel.fetch_message(search_id)
         if radio.active_view_type == "history":
-            from ui_views import HistoryView
             history = db.get_full_history(
                 limit=radio.config.history_items_per_page, 
                 offset=radio.last_history_page * radio.config.history_items_per_page,
@@ -154,17 +152,14 @@ async def refresh_all_uis():
             total_count = db.get_history_count(filter_from=radio.filter_from, filter_to=radio.filter_to)
             await msg.edit(view=HistoryView(radio, db, history, total_count, page=radio.last_history_page))
         elif radio.active_view_type == "search" and radio.last_search_query:
-            from ui_views import SearchResultsView
             await msg.edit(view=SearchResultsView(
                 radio, db, radio.last_search_results, radio.last_search_query, 
                 radio.last_search_user, page=radio.last_search_page, 
                 search_type=radio.last_search_type
             ))
         elif radio.active_view_type == "studio":
-            from ui_views import PlaylistStudioView
             await msg.edit(view=PlaylistStudioView(radio, db))
         elif radio.active_view_type == "playlist_editor" and radio.editing_playlist_id:
-            from ui_views import PlaylistEditorView
             await msg.edit(view=PlaylistEditorView(radio, db, radio.editing_playlist_id, page=radio.last_editor_page))
     except:
         pass

@@ -47,4 +47,22 @@ async def on_ready():
 
     bot.loop.create_task(embed_refresh_loop())
 
+@bot.event
+async def on_voice_state_update(member, before, after):
+    if member.id == bot.user.id:
+        if after.channel and (not before.channel or before.channel.id != after.channel.id):
+            # Bot moved or joined a channel
+            radio.voice_channel_id = after.channel.id
+            radio.voice = member.guild.voice_client # Safer reference
+            radio.embed_manager.save_value("voice_channel_id", after.channel.id)
+            await update_now_playing(radio.current_song or {})
+            print(f"[VOICE] Bot moved to {after.channel.name}")
+        elif not after.channel and before.channel:
+            # Bot disconnected from voice
+            radio.voice_channel_id = None
+            radio.voice = None
+            radio.embed_manager.save_value("voice_channel_id", None)
+            await update_now_playing(radio.current_song or {})
+            print(f"[VOICE] Bot disconnected from voice")
+
 bot.run(config.token)

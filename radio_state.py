@@ -38,7 +38,7 @@ class RadioState:
         self.is_forward_action: bool = False
         self.action_queue = asyncio.Queue()
         self.last_user: discord.Member | discord.User | None = None
-        self.language: str = "en"
+        self.language: str = config.default_language
         self.last_history_paths: list[str] = []
         self.last_back_time: float = 0.0
         self.forward_stack: list[dict] = []

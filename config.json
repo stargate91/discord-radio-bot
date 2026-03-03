@@ -4,6 +4,7 @@
     "radio_text_channel_id": "YOUR_RADIO_TEXT_CHANNEL_ID",
     "afk_channel_id": "YOUR_AFK_CHANNEL_ID",
     "default_genre": "Electronic",
+    "default_language": "en",
     "supported_extensions": [
         "mp3",
         "flac",
