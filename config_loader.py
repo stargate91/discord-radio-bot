@@ -22,6 +22,7 @@ class Config:
         self.default_genre = data["default_genre"]
         self.default_language = data.get("default_language", "en")
         self.default_ui_mode = data.get("default_ui_mode", "full")
+        self.default_presence = data.get("default_presence", "Waiting for signal...")
         self.supported_extensions = set(
             data.get("supported_extensions", [])
         )

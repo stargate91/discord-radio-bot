@@ -3,6 +3,7 @@ from pathlib import Path
 from embed_state import EmbedStateManager
 from scanner import find_and_save_cover
 from ui_translate import t, init_translate
+from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from ui_player import UnifiedStandbyView, FrequencyStationView, NowPlayingView, init_player_ui
 from ui_search import SearchResultsView, FullQueueView
 from ui_studio import PlaylistStudioView, PlaylistEditorView, HistoryView
@@ -27,6 +28,26 @@ def init_ui(_bot, _config, _radio, _db):
     init_player_ui(bot, config, update_now_playing)
 
 async def update_now_playing(song: dict):
+    # Presence Update
+    try:
+        if radio.status == RadioStatusEnum.PLAYING and song:
+            artist = song.get("artist", "Unknown")
+            title = song.get("title", "Unknown")
+            prefix = t("presence_listening")
+            activity = discord.Game(name=f"{prefix} {artist} - {title}")
+            await bot.change_presence(activity=activity)
+        elif radio.status == RadioStatusEnum.PAUSED and song:
+            artist = song.get("artist", "Unknown")
+            title = song.get("title", "Unknown")
+            status_text = t("presence_paused")
+            activity = discord.Game(name=f"[{status_text}] {artist} - {title}")
+            await bot.change_presence(activity=activity)
+        else:
+            activity = discord.Game(name=config.default_presence)
+            await bot.change_presence(activity=activity)
+    except Exception as e:
+        print(f"Failed to update presence: {e}")
+
     channel = bot.get_channel(config.radio_text_channel_id)
     if not channel:
         return
@@ -124,8 +145,6 @@ async def update_now_playing(song: dict):
                 msg = await channel.fetch_message(search_id)
                 await msg.edit(view=FullQueueView(radio, page=radio.last_queue_page))
             except: pass
-
-
 async def force_new_embed():
     channel = bot.get_channel(config.radio_text_channel_id)
     if not channel:

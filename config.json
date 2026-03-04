@@ -6,6 +6,7 @@
     "default_genre": "Electronic",
     "default_language": "en",
     "default_ui_mode": "full",
+    "default_presence": "Waiting for signal...",
     "supported_extensions": [
         "mp3",
         "flac",
