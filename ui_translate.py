@@ -1,9 +1,5 @@
 from ui_icons import Icons
-
-
-
 LOCALES = {
-
     "en": {
         "system_sync": f"{Icons.SYNC} CONNECTION",
         "synchro_subtitle": "Pick a channel to start the transmission.\n\"I'm everything you want to hear.\"",
@@ -158,7 +154,6 @@ LOCALES = {
         "rescanning": "Scanning the library... Hold on.",
         "rescan_complete": "Scan's done! Found {inserted} new tracks, skipped {skipped}."
     },
-
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
         "synchro_subtitle": "Válassz csatornát az adás megkezdéséhez.\n\"Én vagyok minden, amit hallani akarsz.\"",
@@ -312,47 +307,19 @@ LOCALES = {
         "rescanning": "Zenetár szkennelése... Kérlek várj.",
         "rescan_complete": "Szkennelés kész! {inserted} új dal hozzáadva, {skipped} kihagyva."
     }
-
 }
-
-
-
 _radio_ref = None
 
-
-
 def init_translate(radio_instance):
-
     global _radio_ref
-
     _radio_ref = radio_instance
 
-
-
-
-
 def t(key):
-
     lang = "en"
-
     if _radio_ref:
-
         lang = getattr(_radio_ref, "language", "en")
-
-
-
-
-
     current_locales = LOCALES.get(lang, LOCALES["en"])
-
     result = current_locales.get(key)
-
-
-
     if result is None:
-
         result = LOCALES["en"].get(key, key)
-
-
-
     return result
