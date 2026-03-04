@@ -109,13 +109,19 @@ class DisconnectButton(discord.ui.Button):
         await interaction.response.send_message(t("severing"), ephemeral=True)
 
 class GenreSelect(discord.ui.Select):
-    def __init__(self, radio, db):
+    def __init__(self, radio, db, genres):
         self.radio = radio
         self.db = db
-        genres = db.get_all_genres()
+        
+        
         if "levifav" not in genres:
-            genres.append("levifav")
-        options = [discord.SelectOption(label=g.upper(), value=g, emoji=Icons.GENRE) for g in genres]
+            genres.insert(0, "levifav")
+        
+        limited_genres = genres[:25]
+        if len(genres) > 25:
+            print(f"[UI] Warning: Too many genres ({len(genres)}), capping to 25 for select menu.")
+
+        options = [discord.SelectOption(label=g.upper(), value=g, emoji=Icons.GENRE) for g in limited_genres]
         super().__init__(
             placeholder=t('placeholder_genre'),
             min_values=1,
@@ -235,7 +241,7 @@ class BackButton(discord.ui.Button):
             current_path = self.radio.current_song.get("path")
             if current_path not in self.radio.last_history_paths:
                 self.radio.last_history_paths.append(current_path)
-        prev_song = self.db.get_previous_song(self.radio.last_history_paths)
+        prev_song = await self.db.get_previous_song(self.radio.last_history_paths)
         if prev_song:
             self.radio.dispatch(RadioAction.BACK, prev_song, user=interaction.user)
             await interaction.response.send_message(f"{t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
@@ -346,8 +352,8 @@ class LikeButton(discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         song_path = self.radio.current_song.get("path")
         try:
-            status = self.db.toggle_rating(interaction.user.id, song_path, 'like')
-            updated_song = self.db.get_song_by_path(song_path)
+            status = await self.db.toggle_rating(interaction.user.id, song_path, 'like')
+            updated_song = await self.db.get_song_by_path(song_path)
             if updated_song:
                 self.radio.last_user = interaction.user
                 self.radio.current_song = updated_song
@@ -380,8 +386,8 @@ class DislikeButton(discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         song_path = self.radio.current_song.get("path")
         try:
-            status = self.db.toggle_rating(interaction.user.id, song_path, 'dislike')
-            updated_song = self.db.get_song_by_path(song_path)
+            status = await self.db.toggle_rating(interaction.user.id, song_path, 'dislike')
+            updated_song = await self.db.get_song_by_path(song_path)
             if updated_song:
                 self.radio.last_user = interaction.user
                 self.radio.current_song = updated_song
@@ -503,8 +509,9 @@ class FrequencyStationView(LayoutView):
         self.add_item(station_container)
 
 class NowPlayingView(LayoutView):
-    def __init__(self, radio, db, song=None, cover_path=None):
+    def __init__(self, radio, db, genres=None, song=None, cover_path=None):
         super().__init__(timeout=None)
+        genres = genres or []
         song = song or radio.current_song or {}
 
         accent_color = Theme.PLAYING
@@ -580,7 +587,7 @@ class NowPlayingView(LayoutView):
 
         master_container.add_item(Separator())
         genre_row = ActionRow()
-        genre_row.add_item(GenreSelect(radio, db))
+        genre_row.add_item(GenreSelect(radio, db, genres))
         master_container.add_item(genre_row)
         master_container.add_item(Separator())
 

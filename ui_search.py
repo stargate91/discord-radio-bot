@@ -53,7 +53,7 @@ class SearchModal(Modal):
         await interaction.response.defer(ephemeral=True)
 
         query = self.query_input.value
-        results = self.db.search_songs(query)
+        results = await self.db.search_songs(query)
 
         if not results:
             await interaction.followup.send(f"{t('search_no_results')} `{query}`", ephemeral=True)
@@ -71,7 +71,14 @@ class SearchModal(Modal):
         self.radio.last_search_user = interaction.user
         self.radio.active_view_type = "search"
 
-        view = SearchResultsView(self.radio, self.db, results, query, interaction.user)
+        existing_paths = set()
+        if self.radio.editing_playlist_id:
+            playlist_songs = await self.db.get_playlist_songs(self.radio.editing_playlist_id)
+            existing_paths = {s['path'] for s in playlist_songs}
+        
+        all_playlists = await self.db.get_all_playlists() if self.radio.editing_playlist_id else []
+
+        view = SearchResultsView(self.radio, self.db, results, query, interaction.user, existing_paths=existing_paths, all_playlists=all_playlists)
         msg = await interaction.channel.send(view=view)
         embed_state.save_message_id("search", msg.id)
         await interaction.followup.send("Search results posted.", ephemeral=True)
@@ -94,7 +101,7 @@ class AddSongButton(discord.ui.Button):
             await interaction.response.defer(ephemeral=True)
             from database import DatabaseManager
             db = DatabaseManager()
-            db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
+            await db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
             await interaction.followup.send(f"{t('song_added_to_playlist')} **{self.song['artist']} - {self.song['title']}**", ephemeral=True)
 
             search_id = self.radio.embed_manager.load_message_id("search")
@@ -102,7 +109,10 @@ class AddSongButton(discord.ui.Button):
                 try:
                     msg = await interaction.channel.fetch_message(search_id)
                     if self.radio.active_view_type == "search":
-                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type)
+                        playlist_songs = await db.get_playlist_songs(self.radio.editing_playlist_id)
+                        existing_paths = {s['path'] for s in playlist_songs}
+                        all_playlists = await db.get_all_playlists()
+                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type, existing_paths=existing_paths, all_playlists=all_playlists)
                         await msg.edit(view=view)
                     elif self.radio.active_view_type in ["playlist_editor", "studio"]:
                         from ui_studio import PlaylistEditorView
@@ -133,12 +143,19 @@ class TabButton(discord.ui.Button):
         await interaction.response.defer()
 
         results = []
-        if self.search_type == "songs": results = self.db.search_songs(self.query)
-        elif self.search_type == "artists": results = self.db.search_artists(self.query)
-        elif self.search_type == "albums": results = self.db.search_albums(self.query)
-        elif self.search_type == "playlists": results = self.db.get_all_playlists(self.user.id)
+        if self.search_type == "songs": results = await self.db.search_songs(self.query)
+        elif self.search_type == "artists": results = await self.db.search_artists(self.query)
+        elif self.search_type == "albums": results = await self.db.search_albums(self.query)
+        elif self.search_type == "playlists": results = await self.db.get_all_playlists(self.user.id)
 
-        view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type)
+        existing_paths = set()
+        all_playlists = []
+        if self.radio.editing_playlist_id:
+            playlist_songs = await self.db.get_playlist_songs(self.radio.editing_playlist_id)
+            existing_paths = {s['path'] for s in playlist_songs}
+            all_playlists = await self.db.get_all_playlists()
+
+        view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type, existing_paths=existing_paths, all_playlists=all_playlists)
         await interaction.edit_original_response(view=view)
 
 class SearchBySelectionButton(discord.ui.Button):
@@ -160,16 +177,23 @@ class SearchBySelectionButton(discord.ui.Button):
 
         results = []
         new_search_type = "songs"
-        if self.search_type == "artist_songs": results = self.db.search_by_artist(self.value)
+        if self.search_type == "artist_songs": results = await self.db.search_by_artist(self.value)
         elif self.search_type == "artist_albums":
-            results = self.db.get_albums_by_artist(self.value)
+            results = await self.db.get_albums_by_artist(self.value)
             new_search_type = "albums"
-        elif self.search_type == "album_songs": results = self.db.search_by_album(self.value[0], self.value[1])
+        elif self.search_type == "album_songs": results = await self.db.search_by_album(self.value[0], self.value[1])
         elif self.search_type == "playlist_songs":
-            results = self.db.get_playlist_songs(self.value)
+            results = await self.db.get_playlist_songs(self.value)
             new_search_type = "songs"
 
-        view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type, original_query=self.original_query)
+        existing_paths = set()
+        all_playlists = []
+        if self.radio.editing_playlist_id:
+            playlist_songs = await self.db.get_playlist_songs(self.radio.editing_playlist_id)
+            existing_paths = {s['path'] for s in playlist_songs}
+            all_playlists = await self.db.get_all_playlists()
+
+        view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type, original_query=self.original_query, existing_paths=existing_paths, all_playlists=all_playlists)
         await interaction.edit_original_response(view=view)
 
 class QueueAllButton(discord.ui.Button):
@@ -188,7 +212,7 @@ class QueueAllButton(discord.ui.Button):
             from database import DatabaseManager
             db = DatabaseManager()
             for song in self.songs:
-                db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
+                await db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
             await interaction.followup.send(t('bulk_added_to_playlist').format(count=len(self.songs)), ephemeral=True)
 
             search_id = self.radio.embed_manager.load_message_id("search")
@@ -196,7 +220,10 @@ class QueueAllButton(discord.ui.Button):
                 try:
                     msg = await interaction.channel.fetch_message(search_id)
                     if self.radio.active_view_type == "search":
-                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type)
+                        playlist_songs = await db.get_playlist_songs(self.radio.editing_playlist_id)
+                        existing_paths = {s['path'] for s in playlist_songs}
+                        all_playlists = await db.get_all_playlists()
+                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type, existing_paths=existing_paths, all_playlists=all_playlists)
                         await msg.edit(view=view)
                     elif self.radio.active_view_type in ["playlist_editor", "studio"]:
                         from ui_studio import PlaylistEditorView
@@ -243,7 +270,7 @@ class RemoveFromQueueButton(discord.ui.Button):
 
 
 class SearchResultsView(LayoutView):
-    def __init__(self, radio, db, results, query, user, page=0, search_type="songs", original_query=None):
+    def __init__(self, radio, db, results, query, user, page=0, search_type="songs", original_query=None, existing_paths=None, all_playlists=None):
         super().__init__(timeout=None)
         self.radio = radio
         self.db = db
@@ -256,10 +283,8 @@ class SearchResultsView(LayoutView):
         self.items_per_page = radio.config.search_items_per_page
         self.total_pages = (len(results) - 1) // self.items_per_page + 1 if results else 1
 
-        self.existing_paths = set()
-        if self.radio.editing_playlist_id:
-            playlist_songs = self.db.get_playlist_songs(self.radio.editing_playlist_id)
-            self.existing_paths = {s['path'] for s in playlist_songs}
+        self.existing_paths = existing_paths or set()
+        self.all_playlists = all_playlists or []
 
         self.radio.active_view_type = "search"
         container = Container(accent_color=Theme.BACKGROUND)
@@ -284,8 +309,7 @@ class SearchResultsView(LayoutView):
         container.add_item(Separator())
 
         if self.radio.editing_playlist_id:
-            playlists = self.db.get_all_playlists()
-            playlist_name = next((p['name'] for p in playlists if p['id'] == self.radio.editing_playlist_id), "...")
+            playlist_name = next((p['name'] for p in self.all_playlists if p['id'] == self.radio.editing_playlist_id), "...")
             container.add_item(TextDisplay(f"{Icons.STATUS} **{playlist_name}** ({len(self.existing_paths)} {t('songs')})"))
             container.add_item(Separator())
 
@@ -353,7 +377,15 @@ class SearchResultsView(LayoutView):
     async def update_view(self, interaction):
         self.radio.last_search_page = self.page
         self.radio.last_search_type = self.search_type
-        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type, original_query=self.original_query)
+        
+        existing_paths = set()
+        all_playlists = []
+        if self.radio.editing_playlist_id:
+            playlist_songs = await self.db.get_playlist_songs(self.radio.editing_playlist_id)
+            existing_paths = {s['path'] for s in playlist_songs}
+            all_playlists = await self.db.get_all_playlists()
+
+        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type, original_query=self.original_query, existing_paths=existing_paths, all_playlists=all_playlists)
         await interaction.edit_original_response(view=new_view)
 
 class MoveSongInQueueButton(discord.ui.Button):

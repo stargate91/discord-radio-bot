@@ -57,6 +57,10 @@ class Config:
         self.theme_playing = int(theme_data.get("playing", "0x5865F2"), 16)
         self.theme_background = int(theme_data.get("background", "0x2b2d31"), 16)
         self.theme_accent = int(theme_data.get("accent", "0x5865F2"), 16)
+        
+        # Interval settings
+        self.cleanup_interval_days = int(data.get("cleanup_interval_days", 7))
+        self.scan_interval_days = int(data.get("scan_interval_days", 1))
 
         self.token = os.getenv("DISCORD_TOKEN")
 

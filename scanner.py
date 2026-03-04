@@ -38,7 +38,7 @@ def get_cover_art(file_path: Path) -> bytes | None:
 
     return None
 
-def find_and_save_cover(file_path: Path, db) -> str | None:
+async def find_and_save_cover(file_path: Path, db) -> str | None:
     folder = file_path.parent
     cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
 
@@ -61,6 +61,7 @@ def find_and_save_cover(file_path: Path, db) -> str | None:
 
     cache_path = cache_dir / f"{file_hash}.{ext}"
     if not cache_path.exists():
+        
         cache_path.write_bytes(art_bytes)
 
     return str(cache_path)
@@ -141,66 +142,80 @@ def extract_tags(file_path: Path):
         "duration": duration,
         "mediatype_flac": mediatype_flac,
         "mediatype_mp3": mediatype_mp3,
-        "rating": safe_int(rating)
+        "rating": safe_int(rating),
+        "mtime": int(file_path.stat().st_mtime) if file_path.exists() else 0
     }
 
-def scan_music_library(config, db, force=False):
+async def process_song(full_path: Path, genre: str, config, db, conn, force=False):
+    
+    file_mtime = int(full_path.stat().st_mtime)
+    
+    if not force:
+        
+        existing = await db.get_song_by_path(str(full_path))
+        if existing and existing.get('mtime', 0) >= file_mtime:
+            return False
+
+    tags = extract_tags(full_path)
+    if not tags:
+        return False
+
+    inserted_flag = await db.insert_song_batch(conn, {
+        "path": str(full_path),
+        "artist": tags["artist"],
+        "title": tags["title"],
+        "album": tags["album"],
+        "date": tags["date"],
+        "genre": genre,
+        "label": tags["label"],
+        "catnum": tags["catnum"],
+        "duration": tags["duration"],
+        "mediatype_flac": tags["mediatype_flac"],
+        "mediatype_mp3": tags["mediatype_mp3"],
+        "rating": tags["rating"],
+        "mtime": tags["mtime"]
+    })
+
+    if inserted_flag:
+        cover_art_path = await find_and_save_cover(full_path, db)
+        if cover_art_path:
+            await db.save_song_cover_path(str(full_path), cover_art_path, db=conn)
+    return inserted_flag
+
+async def scan_music_library(config, db, force=False):
     inserted = 0
     skipped = 0
 
-    if not force and not db.is_empty():
-        return 0, 0
-
-    with db._connect() as conn:
-        cursor = conn.cursor()
-
+    async with db._connect() as conn:
         for genre, paths in config.genres.items():
-
-
             for base_path in paths:
                 base_path = Path(base_path)
-
                 if not base_path.exists():
                     print(f" Missing path: {base_path}")
                     continue
 
                 for root, _, files in os.walk(base_path):
                     for file in files:
-
-
-
                         ext = Path(file).suffix.lower().replace(".", "")
                         if ext not in config.supported_extensions:
                             continue
 
                         full_path = Path(root) / file
-                        tags = extract_tags(full_path)
-
-                        if not tags:
-                            skipped += 1
-                            continue
-
-                        inserted_flag = db.insert_song_batch(cursor, {
-                            "path": str(full_path),
-                            "artist": tags["artist"],
-                            "title": tags["title"],
-                            "album": tags["album"],
-                            "date": tags["date"],
-                            "genre": genre,
-                            "label": tags["label"],
-                            "catnum": tags["catnum"],
-                            "duration": tags["duration"],
-                            "mediatype_flac": tags["mediatype_flac"],
-                            "mediatype_mp3": tags["mediatype_mp3"],
-                            "rating": tags["rating"],
-                        })
-
-                        if inserted_flag:
+                        if await process_song(full_path, genre, config, db, conn, force=force):
                             inserted += 1
-                            cover_path = find_and_save_cover(full_path, db)
-                            if cover_path:
-                                db.save_song_cover_path(str(full_path), cover_path, cursor=cursor)
+                        else:
+                            skipped += 1
 
-        conn.commit()
+        await conn.commit()
 
     return inserted, skipped
+
+async def cleanup_database(db):
+    paths = await db.get_all_song_paths()
+    removed = 0
+    for path in paths:
+        if not Path(path).exists():
+            await db.remove_song_by_path(path)
+            removed += 1
+    return removed
+

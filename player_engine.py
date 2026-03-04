@@ -63,7 +63,7 @@ async def radio_player():
                 if action == RadioAction.SET_GENRE:
                     _radio_ref.genre = data
                     _radio_ref.is_seeking = False
-                    _radio_ref.refresh_queue()
+                    await _radio_ref.refresh_queue()
                 elif action == RadioAction.SET_VOLUME:
                     _radio_ref.volume = data
                     continue
@@ -90,14 +90,14 @@ async def radio_player():
                 if action == RadioAction.SET_GENRE:
                     _radio_ref.genre = data
                     _radio_ref.is_seeking = False
-                    _radio_ref.refresh_queue()
+                    await _radio_ref.refresh_queue()
                 elif action == RadioAction.SET_VOLUME:
                     _radio_ref.volume = data
                 elif action == RadioAction.SKIP:
                     _radio_ref.is_seeking = False
                 elif action == RadioAction.STOP:
                     _radio_ref.status = RadioStatusEnum.IDLE
-                    _radio_ref.refresh_queue()
+                    await _radio_ref.refresh_queue()
                 elif action == RadioAction.JOIN:
                     _radio_ref.voice_channel_id = data
                     _radio_ref.embed_manager.save_value("voice_channel_id", data)
@@ -125,7 +125,7 @@ async def radio_player():
                 song = _radio_ref.current_song
             else:
                 if not _radio_ref.queue:
-                    _radio_ref.refresh_queue()
+                    await _radio_ref.refresh_queue()
 
                 if _radio_ref.queue:
                     song = _radio_ref.queue.pop(0)
@@ -137,7 +137,7 @@ async def radio_player():
                     _radio_ref.is_back_action = False
                     _radio_ref.is_forward_action = False
 
-                    new_song = _radio_ref.get_random_song_by_genre(_radio_ref.genre)
+                    new_song = await _radio_ref.get_random_song_by_genre(_radio_ref.genre)
                     if new_song:
                         _radio_ref.queue.append(new_song)
                 else:
@@ -196,7 +196,7 @@ async def radio_player():
             while not done.is_set():
                 if not history_saved and (asyncio.get_event_loop().time() - start_time >= 2.0):
                     user_id = _radio_ref.last_user.id if _radio_ref.last_user else None
-                    _db_ref.add_to_history(song["path"], user_id)
+                    await _db_ref.add_to_history(song["path"], user_id)
                     history_saved = True
                 try:
                     action_task = asyncio.create_task(_radio_ref.action_queue.get())
@@ -219,7 +219,7 @@ async def radio_player():
                             _radio_ref.is_seeking = False
                             _radio_ref.forward_stack = []
                             _radio_ref.last_history_paths = []
-                            _radio_ref.refresh_queue()
+                            await _radio_ref.refresh_queue()
                             voice.stop()
                             break
                         elif action == RadioAction.SEEK:
@@ -276,7 +276,7 @@ async def radio_player():
                         elif action == RadioAction.SET_GENRE:
                             _radio_ref.genre = data
                             _radio_ref.is_seeking = False
-                            _radio_ref.refresh_queue()
+                            await _radio_ref.refresh_queue()
                             voice.stop()
                             break
                         elif action == RadioAction.ADD_TO_QUEUE:
@@ -330,7 +330,7 @@ async def radio_player():
             elapsed_time = asyncio.get_event_loop().time() - start_time
 
             if elapsed_time >= ten_percent_duration:
-                _db_ref.update_last_played(song["path"])
+                await _db_ref.update_last_played(song["path"])
                 print(f"Play count updated for: {song['path']}")
 
             raw_source.cleanup()

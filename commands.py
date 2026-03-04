@@ -11,11 +11,11 @@ def setup_commands(tree, radio, db):
             await interaction.response.send_message("You are not in a voice channel!", ephemeral=True)
             return
 
-        song = db.get_song_by_id(int(query)) if query.isdigit() else None
+        song = await db.get_song_by_id(int(query)) if query.isdigit() else None
         if not song:
-            song = db.get_song_by_path(query)
+            song = await db.get_song_by_path(query)
         if not song:
-            results = db.search_songs(query)
+            results = await db.search_songs(query)
             if results:
                 song = results[0]
         if not song:
@@ -39,7 +39,12 @@ def setup_commands(tree, radio, db):
         from ui import embed_state
         await interaction.response.defer()
         
-        view = StatsView(radio, db, interaction.user, guild=interaction.guild)
+        days = 7
+        top_artists = await db.get_top_artists(days=days)
+        top_songs = await db.get_top_songs(days=days)
+        top_users = await db.get_top_users(days=days)
+        
+        view = StatsView(radio, db, interaction.user, guild=interaction.guild, top_artists=top_artists, top_songs=top_songs, top_users=top_users)
         
         old_id = embed_state.load_message_id("search")
         if old_id:
@@ -56,7 +61,7 @@ def setup_commands(tree, radio, db):
         if not current or len(current) < 2:
             return []
 
-        results = db.search_songs(current)
+        results = await db.search_songs(current)
         choices = []
         for s in results[:25]:
             label = f"{s['artist']} - {s['title']}"

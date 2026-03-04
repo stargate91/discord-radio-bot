@@ -46,10 +46,10 @@ class RadioState:
         self.last_editor_page: int = 0
         self.is_compact: bool = (config.default_ui_mode == "compact")
 
-    def refresh_queue(self):
+    async def refresh_queue(self):
         self.queue = []
         for _ in range(self.config.queue_refresh_limit):
-            song = self.get_random_song_by_genre(self.genre)
+            song = await self.get_random_song_by_genre(self.genre)
             if song:
                 self.queue.append(song)
 
@@ -59,10 +59,10 @@ class RadioState:
             self.last_user = user
         self.action_queue.put_nowait((action, data))
 
-    def get_random_song_by_genre(self, genre: str):
+    async def get_random_song_by_genre(self, genre: str):
         if genre.lower() == "levifav":
-            return self.db.get_random_song_by_rating(min_rating=self.config.levifav_min_rating)
-        return self.db.get_random_song_by_genre(genre)
+            return await self.db.get_random_song_by_rating(min_rating=self.config.levifav_min_rating)
+        return await self.db.get_random_song_by_genre(genre)
 
     def get_display_queue(self):
         return list(reversed(self.forward_stack)) + self.queue

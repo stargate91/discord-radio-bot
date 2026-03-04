@@ -28,7 +28,6 @@ def init_ui(_bot, _config, _radio, _db):
     init_player_ui(bot, config, update_now_playing)
 
 async def update_now_playing(song: dict):
-    # Presence Update
     try:
         if radio.status == RadioStatusEnum.PLAYING and song:
             artist = song.get("artist", "Unknown")
@@ -94,11 +93,11 @@ async def update_now_playing(song: dict):
     song_path = song.get("path")
 
     if song_path:
-        cover_path = db.get_song_cover_path(song_path)
+        cover_path = await db.get_song_cover_path(song_path)
         if not cover_path or not Path(cover_path).exists():
-            temp_path = find_and_save_cover(Path(song_path), db)
+            temp_path = await find_and_save_cover(Path(song_path), db)
             if temp_path:
-                db.save_song_cover_path(song_path, temp_path)
+                await db.save_song_cover_path(song_path, temp_path)
                 cover_path = temp_path
 
     valid_file = False
@@ -111,7 +110,8 @@ async def update_now_playing(song: dict):
 
 
 
-    player_view = NowPlayingView(radio, db, song=song, cover_path=cover_path if valid_file else None)
+    genres = await db.get_all_genres()
+    player_view = NowPlayingView(radio, db, genres=genres, song=song, cover_path=cover_path if valid_file else None)
 
     if not radio.now_playing_message:
         msg_id = embed_state.load_message_id("player")
@@ -181,15 +181,14 @@ async def refresh_all_uis():
     try:
         msg = await channel.fetch_message(search_id)
         if radio.active_view_type == "history":
-
             limit = 5
-            history = db.get_full_history(
+            history = await db.get_full_history(
                 limit=limit,
                 offset=radio.last_history_page * limit,
                 filter_from=radio.filter_from,
                 filter_to=radio.filter_to
             )
-            total_count = db.get_history_count(filter_from=radio.filter_from, filter_to=radio.filter_to)
+            total_count = await db.get_history_count(filter_from=radio.filter_from, filter_to=radio.filter_to)
             await msg.edit(view=HistoryView(radio, db, history, total_count, page=radio.last_history_page))
         elif radio.active_view_type == "search" and radio.last_search_query:
             await msg.edit(view=SearchResultsView(

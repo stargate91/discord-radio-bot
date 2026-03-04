@@ -4,6 +4,8 @@
     "radio_text_channel_id": "YOUR_RADIO_TEXT_CHANNEL_ID",
     "afk_channel_id": "YOUR_AFK_CHANNEL_ID",
     "default_genre": "Electronic",
+    "cleanup_interval_days": 14,
+    "scan_interval_days": 14,
     "default_language": "en",
     "default_ui_mode": "full",
     "default_presence": "Waiting for signal...",
