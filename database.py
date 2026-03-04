@@ -101,6 +101,41 @@ class DatabaseManager:
             await db.execute("CREATE INDEX IF NOT EXISTS idx_history_timestamp ON playback_history(timestamp)")
         
             await db.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts USING fts5(
+                artist, title, album,
+                content='songs',
+                content_rowid='id'
+            )
+            """)
+
+            await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS songs_ai AFTER INSERT ON songs BEGIN
+                INSERT INTO songs_fts(rowid, artist, title, album) 
+                VALUES (new.id, new.artist, new.title, new.album);
+            END;
+            """)
+            await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS songs_ad AFTER DELETE ON songs BEGIN
+                INSERT INTO songs_fts(songs_fts, rowid, artist, title, album) 
+                VALUES('delete', old.id, old.artist, old.title, old.album);
+            END;
+            """)
+            await db.execute("""
+            CREATE TRIGGER IF NOT EXISTS songs_au AFTER UPDATE ON songs BEGIN
+                INSERT INTO songs_fts(songs_fts, rowid, artist, title, album) 
+                VALUES('delete', old.id, old.artist, old.title, old.album);
+                INSERT INTO songs_fts(rowid, artist, title, album) 
+                VALUES (new.id, new.artist, new.title, new.album);
+            END;
+            """)
+
+            # Populate FTS if empty
+            async with db.execute("SELECT COUNT(*) FROM songs_fts") as cursor:
+                if (await cursor.fetchone())[0] == 0:
+                    print("[DB] Initializing Search Index (FTS)...")
+                    await db.execute("INSERT INTO songs_fts(rowid, artist, title, album) SELECT id, artist, title, album FROM songs")
+            
+            await db.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT
@@ -294,36 +329,37 @@ class DatabaseManager:
     async def search_songs(self, query: str) -> list[dict]:
         async with self._connect() as db:
             db.row_factory = aiosqlite.Row
-            words = query.split()
-            if not words: return []
+            
+            fts_query = query.replace('"', "").replace("'", "")
+            if not fts_query.strip(): return []
 
+            sql = """
+                SELECT s.* FROM songs s
+                JOIN songs_fts f ON s.id = f.rowid
+                WHERE songs_fts MATCH ?
+                ORDER BY rank
+                LIMIT 100
+            """
+            
+            try:
+                prepared_query = " ".join([f"{word}*" for word in fts_query.split()])
+                async with db.execute(sql, (prepared_query,)) as cursor:
+                    rows = await cursor.fetchall()
+                    if rows: return [dict(row) for row in rows]
+            except:
+                pass
+
+            words = query.split()
             where_clauses = []
             params = []
             for word in words:
                 pattern = f"%{word}%"
-                where_clauses.append("(artist LIKE ? OR title LIKE ? OR album LIKE ? OR date LIKE ?)")
-                params.extend([pattern, pattern, pattern, pattern])
+                where_clauses.append("(artist LIKE ? OR title LIKE ? OR album LIKE ?)")
+                params.extend([pattern, pattern, pattern])
 
             where_sql = " AND ".join(where_clauses)
-            full_pattern = f"%{query}%"
-            start_pattern = f"{query}%"
-
-            priority_sql = """
-                CASE
-                    WHEN artist = ? OR title = ? THEN 1
-                    WHEN artist LIKE ? OR title LIKE ? THEN 2
-                    ELSE 3
-                END as priority
-            """
-
-            sql = f"""
-                SELECT *, {priority_sql}
-                FROM songs
-                WHERE {where_sql}
-                ORDER BY priority ASC, artist ASC, title ASC
-            """
-            all_params = [query, query, start_pattern, start_pattern] + params
-            async with db.execute(sql, tuple(all_params)) as cursor:
+            sql = f"SELECT * FROM songs WHERE {where_sql} LIMIT 100"
+            async with db.execute(sql, tuple(params)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
