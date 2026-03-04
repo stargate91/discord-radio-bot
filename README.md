@@ -1,123 +1,86 @@
 # Discord Radio Bot
 
-This is a 24/7 Discord radio bot that plays music from local folders in a voice channel. 
+A premium, 24/7 Discord radio engine designed for high-fidelity personal hosting. It plays music from local directories, manages a rich metadata-driven library via SQLite, and provides a feature-packed interactive control panel.
 
-It connects to a specified voice channel and plays random tracks from selected genres. The bot manages songs using an SQLite database and includes a comprehensive UI panel for control.
+## Key Features
 
-## Requirements
+- **24/7 Streaming**: Persistent playback that stays connected and reloads automatically.
+- **Slash Command Engine**: Interactive `/play` command with real-time autocomplete search.
+- **Advanced Library Management**:
+    - **Smart Scanner**: Automatic metadata extraction (Artist, Title, Album, Year, Label) and cover art caching.
+    - **SQLite Powered**: Fast searching and reliable storage for history, playlists, and ratings.
+- **Sophisticated Control Panel**:
+    - **Dual UI Modes**: Switch between **Full** (Icons + Labels) and **Compact** (Icons only) modes for different needs.
+    - **Playlist Studio**: Create, rename, delete, and organize your own personal playback lists.
+    - **History & Search**: Paginated history with date filtering and a robust search tab system.
+- **Enhanced Interactions**:
+    - **Rating System**: Like and Dislike tracks; specific support for favorites (levifav mode).
+    - **Multi-language**: Seamless on-the-fly switching between **English** and **Hungarian** locales.
+    - **Audio Controls**: Jump to timestamps (Seek), Forward/Back to previous tracks, and Shuffle controls.
 
-- Python 3.10 or higher
-- FFmpeg installed and added to your system PATH
-- A Discord bot token and server (guild) ID
-- Music files (MP3, FLAC, etc.) on your local machine
+## Project Architecture
 
-Python dependencies:
-```bash
-pip install discord.py mutagen python-dotenv
-```
-
-## Project Structure
-
-- `main.py`: The main entry point, managing the radio loop and Discord client.
-- `config_loader.py`: Handles loading settings from `config.json`.
-- `database.py`: Manages the SQLite database (`data/radio.db`).
-- `scanner.py`: Scans local folders, extracts metadata, and handles cover art.
-- `ui.py`: Handles the Discord embeds and button interactions.
-- `embed_state.py`: Manages persistent message IDs to keep the UI up-to-date across restarts.
-- `radio_actions.py`: Defines the actions and states for the radio engine.
-- `data/`: Directory containing the database and cached cover art.
+- `main.py`: The central hub for bot initialization, event handling, and command registration.
+- `commands.py`: Definition of slash commands and autocomplete interaction logic.
+- `player_engine.py`: The audio playback loop, action handling, and FFmpeg streaming.
+- `radio_state.py`: Global state management and action dispatching.
+- `database.py`: Clean wrapper for all SQLite operations (songs, history, playlists, ratings).
+- `scanner.py`: High-performance filesystem scanner with mutagen for metadata extraction.
+- `ui_player.py`: The main persistent player interface (standby and now-playing views).
+- `ui_studio.py`: Interfaces for managing playlists and browsing playback history.
+- `ui_search.py`: Comprehensive search results with tabbed navigation (Songs, Artists, Albums, Playlists).
+- `ui_translate.py`: Localization dictionary managing multi-language UI tokens.
+- `ui_icons.py`: Centralized registration for all emojis and visual status indicators.
+- `config_loader.py`: Handles configuration loading from config.json.
 
 ## Configuration
 
-The bot uses a `config.json` file for general settings and a `.env` file for the sensitive Discord token.
-
-### 1. Set up the Token
-
-Create a file named `.env` in the root directory and add your Discord bot token:
-
-```text
-DISCORD_TOKEN=your_token_here
-```
-
-### 2. General Settings
-
-Set up your `config.json` file with your server details:
-
-```json
-{
-    "guild_id": "YOUR_SERVER_ID",
-    "voice_channel_id": "VOICE_CHANNEL_ID",
-    "radio_text_channel_id": "TEXT_CHANNEL_ID",
-    "default_genre": "Electronic",
-    "genres": {
-        "Electronic": [
-            "C:/music/electronic"
-        ],
-        "Rock": [
-            "C:/music/rock"
-        ]
-    },
-    "ffmpeg_path": "C:/ffmpeg/bin/ffmpeg.exe",
-    "supported_extensions": ["mp3", "flac", "m4a", "wav"]
-}
-```
-
-### Configuration terms:
-
-- `guild_id`: The ID of the server where the bot will operate.
-- `voice_channel_id`: The ID of the voice channel the bot should join.
-- `radio_text_channel_id`: The ID of the text channel for the control panel.
-- `default_genre`: The genre the bot starts playing when launched.
-- `genres`: A mapping of genre names to lists of local folder paths.
-- `ffmpeg_path`: Optional path to the ffmpeg executable.
-- `supported_extensions`: List of file extensions the scanner should look for.
-
-## How it works
-
-1. Run the bot:
-   ```bash
-   python main.py
+1. **Environment Setup**:
+   Create a `.env` file in the root directory:
+   ```text
+   DISCORD_TOKEN=your_bot_token_here
    ```
-2. On the first run, the bot scans the folders defined in `config.json`.
-3. It extracts metadata (Artist, Title, Album, Year, Label, Duration, etc.).
-4. It extracts and caches cover art in `data/covers/`.
-5. The bot joins the voice channel and starts playing random tracks.
-6. A persistent UI panel is displayed in the text channel for management.
 
-## Features
+2. **Server Configuration**:
+   Edit the `config.json` file with your server details:
+   ```json
+   {
+       "guild_id": "YOUR_SERVER_ID",
+       "voice_channel_id": "VOICE_CHANNEL_ID",
+       "radio_text_channel_id": "CONTROL_PANEL_TEXT_ID",
+       "admin_role_id": "ADMIN_ROLE_ID",
+       "genres": {
+           "Electronic": ["C:/Music/Electronic"],
+           "Jazz": ["C:/Music/Jazz"]
+       },
+       "ffmpeg_path": "ffmpeg"
+   }
+   ```
 
-- **24/7 Playback**: Automatically reconnects and plays music.
-- **Queue System**: Keeps track of upcoming songs (toggleable view).
-- **Genre Switching**: Change genres on the fly via a dropdown menu.
-- **Cover Art**: Displays album art in the detailed info view.
-- **Ratings**: Users can Like or Dislike songs, and the bot can prioritize favorites (`levifav`).
-- **Persistent UI**: UI messages are tracked and updated to prevent spam.
+## Getting Started
 
-### Controls
+### Prerequisites
+- **Python 3.10+**
+- **FFmpeg** (installed and added to your system PATH)
 
-- **▶ Play**: Resume or replay the current track.
-- **⏸ Pause**: Pause playback.
-- **⏹ Stop**: Stop playback and go to IDLE state.
-- **⏭ Skip**: Play the next random song from the queue.
-- **⏩ Move To**: Jump to a specific timestamp (mm:ss).
-- **🔊 Vol**: Adjust the playback volume (0-100%).
-- **❤️ Like / 👎 Dislike**: Rate the current track.
-- **📂 Info**: Toggle the detailed metadata and cover art embed.
-- **📋 Queue**: Toggle the "Up Next" list.
+### Installation
+```bash
+# Clone the repository
+git clone <repository-url>
+cd discord-radio-bot
 
-## Database Info
+# Install required libraries
+# Voice support requires [voice] extra
+pip install "discord.py[voice]" mutagen python-dotenv
 
-The bot uses SQLite (`data/radio.db`). Key tables:
+# Start the broadcast
+python main.py
+```
 
-- `songs`: Stores path, metadata (artist, title, etc.), play counts, and aggregate ratings.
-- `user_ratings`: Tracks individual user likes/dislikes.
-- `song_covers`: Links song paths to cached cover art files.
+## Commands
 
-## Troubleshooting
-
-- **Permission issues**: Ensure the bot has 'Connect', 'Speak', 'Send Messages', and 'Use External Emojis'.
-- **FFmpeg not found**: Double-check `ffmpeg_path` or ensure it's in your system PATH.
-- **Slow startup**: Initial scan of large libraries may take time.
+- `/play <query>`: Instant search and play. Supports multi-word queries and autocomplete suggestions.
 
 ---
-Built for high-fidelity personal radio hosting.
+**GitHub About Snippet:**
+> Premium 24/7 Discord Radio Bot with local library management, Metadata/Cover art extraction, Slash Commands, Playlist Studio, and a high-end persistent UI (EN/HU support).
