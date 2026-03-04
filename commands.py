@@ -1,8 +1,10 @@
 import discord
 from discord import app_commands
 from radio_actions import RadioAction
+from ui_utils import safe_fetch_message, safe_delete_message
 
-def setup_commands(tree, radio, db):
+def setup_commands(tree, radio):
+    db = radio.db
 
     @tree.command(name="play", description="Search and play a song immediately")
     @app_commands.describe(query="Artist or Title of the song")
@@ -36,7 +38,6 @@ def setup_commands(tree, radio, db):
     @tree.command(name="stats", description="Show playback statistics")
     async def stats(interaction: discord.Interaction):
         from ui_studio import StatsView
-        from ui import embed_state
         await interaction.response.defer()
         
         days = 7
@@ -44,17 +45,15 @@ def setup_commands(tree, radio, db):
         top_songs = await db.get_top_songs(days=days)
         top_users = await db.get_top_users(days=days)
         
-        view = StatsView(radio, db, interaction.user, guild=interaction.guild, top_artists=top_artists, top_songs=top_songs, top_users=top_users)
+        view = StatsView(radio, interaction.user, guild=interaction.guild, top_artists=top_artists, top_songs=top_songs, top_users=top_users)
         
-        old_id = embed_state.load_message_id("search")
-        if old_id:
-            try:
-                msg = await interaction.channel.fetch_message(old_id)
-                await msg.delete()
-            except: pass
+        old_id = radio.embed_manager.load_message_id("search")
+        msg = await safe_fetch_message(interaction.channel, old_id)
+        if msg:
+            await safe_delete_message(msg)
             
         msg = await interaction.followup.send(view=view, wait=True)
-        embed_state.save_message_id("search", msg.id)
+        radio.embed_manager.save_message_id("search", msg.id)
 
     @play.autocomplete('query')
     async def play_autocomplete(interaction: discord.Interaction, current: str):

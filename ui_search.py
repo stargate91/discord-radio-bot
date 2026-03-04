@@ -2,22 +2,13 @@ import discord
 from discord.ui import Modal, TextInput, LayoutView, ActionRow, Container, Section, TextDisplay, Separator
 from ui_translate import t
 from ui_icons import Icons
-from ui_utils import fixed, format_duration
+from ui_base import handle_ui_error, PaginatedView
+from ui_utils import fixed, format_duration, safe_delete_message, safe_fetch_message, check_editor_lock
 from radio_actions import RadioAction
 from ui_theme import Theme
 
-async def check_editor_lock(radio, interaction):
-    if radio.playlist_editor_user and radio.playlist_editor_user != interaction.user.id:
-        try:
-            member = await interaction.guild.fetch_member(radio.playlist_editor_user)
-            name = member.display_name
-        except: name = "Someone"
-        await interaction.response.send_message(t("studio_locked_message").format(user=name), ephemeral=True)
-        return True
-    return False
-
 class SearchButton(discord.ui.Button):
-    def __init__(self, radio, db):
+    def __init__(self, radio):
         super().__init__(
             label=None if radio.is_compact else t('search_label'),
             emoji=Icons.SEARCH,
@@ -25,19 +16,20 @@ class SearchButton(discord.ui.Button):
             custom_id="search_button"
         )
         self.radio = radio
-        self.db = db
+        self.db = radio.db
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
-        modal = SearchModal(self.radio, self.db)
+        modal = SearchModal(self.radio)
         await interaction.response.send_modal(modal)
 
 class SearchModal(Modal):
-    def __init__(self, radio, db):
+    def __init__(self, radio):
         super().__init__(title=t("search_modal_title"))
         self.radio = radio
-        self.db = db
+        self.db = radio.db
         self.query_input = TextInput(
             label=t("search_input_label"),
             placeholder="Search...",
@@ -47,9 +39,8 @@ class SearchModal(Modal):
         )
         self.add_item(self.query_input)
 
+    @handle_ui_error
     async def on_submit(self, interaction: discord.Interaction):
-        from ui import embed_state, init_translate
-        init_translate(self.radio)
         await interaction.response.defer(ephemeral=True)
 
         query = self.query_input.value
@@ -59,12 +50,10 @@ class SearchModal(Modal):
             await interaction.followup.send(f"{t('search_no_results')} `{query}`", ephemeral=True)
             return
 
-        old_id = embed_state.load_message_id("search")
-        if old_id:
-            try:
-                msg = await interaction.channel.fetch_message(old_id)
-                await msg.delete()
-            except: pass
+        old_id = self.radio.embed_manager.load_message_id("search")
+        msg = await safe_fetch_message(interaction.channel, old_id)
+        if msg:
+            await safe_delete_message(msg)
 
         self.radio.last_search_query = query
         self.radio.last_search_results = results
@@ -78,9 +67,9 @@ class SearchModal(Modal):
         
         all_playlists = await self.db.get_all_playlists() if self.radio.editing_playlist_id else []
 
-        view = SearchResultsView(self.radio, self.db, results, query, interaction.user, existing_paths=existing_paths, all_playlists=all_playlists)
+        view = SearchResultsView(self.radio, results, query, interaction.user, existing_paths=existing_paths, all_playlists=all_playlists)
         msg = await interaction.channel.send(view=view)
-        embed_state.save_message_id("search", msg.id)
+        self.radio.embed_manager.save_message_id("search", msg.id)
         await interaction.followup.send("Search results posted.", ephemeral=True)
 
 class AddSongButton(discord.ui.Button):
@@ -95,28 +84,27 @@ class AddSongButton(discord.ui.Button):
         self.radio = radio
         self.song = song
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
             await interaction.response.defer(ephemeral=True)
-            from database import DatabaseManager
-            db = DatabaseManager()
-            await db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
+            await self.radio.db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
             await interaction.followup.send(f"{t('song_added_to_playlist')} **{self.song['artist']} - {self.song['title']}**", ephemeral=True)
 
             search_id = self.radio.embed_manager.load_message_id("search")
-            if search_id:
+            msg = await safe_fetch_message(interaction.channel, search_id)
+            if msg:
                 try:
-                    msg = await interaction.channel.fetch_message(search_id)
                     if self.radio.active_view_type == "search":
-                        playlist_songs = await db.get_playlist_songs(self.radio.editing_playlist_id)
+                        playlist_songs = await self.radio.db.get_playlist_songs(self.radio.editing_playlist_id)
                         existing_paths = {s['path'] for s in playlist_songs}
-                        all_playlists = await db.get_all_playlists()
-                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type, existing_paths=existing_paths, all_playlists=all_playlists)
+                        all_playlists = await self.radio.db.get_all_playlists()
+                        view = SearchResultsView(self.radio, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type, existing_paths=existing_paths, all_playlists=all_playlists)
                         await msg.edit(view=view)
                     elif self.radio.active_view_type in ["playlist_editor", "studio"]:
                         from ui_studio import PlaylistEditorView
-                        view = PlaylistEditorView(self.radio, db, self.radio.editing_playlist_id, page=self.radio.last_editor_page)
+                        view = PlaylistEditorView(self.radio, self.radio.editing_playlist_id, page=self.radio.last_editor_page)
                         await msg.edit(view=view)
                 except Exception as e:
                     print(f"DEBUG: Refresh failed: {e}")
@@ -126,20 +114,20 @@ class AddSongButton(discord.ui.Button):
             await interaction.followup.send(f"{t('add_to_queue')} **{self.song['artist']} - {self.song['title']}**", ephemeral=True)
 
 class TabButton(discord.ui.Button):
-    def __init__(self, radio, db, label, search_type, query, user, active=False):
+    def __init__(self, radio, label, search_type, query, user, active=False):
         style = discord.ButtonStyle.primary if active else discord.ButtonStyle.secondary
         super().__init__(label=label, style=style, disabled=active)
         self.radio = radio
-        self.db = db
+        self.db = radio.db
         self.search_type = search_type
         self.query = query
         self.user = user
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
-        from ui import init_translate
-        init_translate(self.radio)
+
         await interaction.response.defer()
 
         results = []
@@ -155,24 +143,24 @@ class TabButton(discord.ui.Button):
             existing_paths = {s['path'] for s in playlist_songs}
             all_playlists = await self.db.get_all_playlists()
 
-        view = SearchResultsView(self.radio, self.db, results, self.query, self.user, search_type=self.search_type, existing_paths=existing_paths, all_playlists=all_playlists)
+        view = SearchResultsView(self.radio, results, self.query, self.user, search_type=self.search_type, existing_paths=existing_paths, all_playlists=all_playlists)
         await interaction.edit_original_response(view=view)
 
 class SearchBySelectionButton(discord.ui.Button):
-    def __init__(self, radio, db, label, search_type, value, user, original_query=None):
+    def __init__(self, radio, label, search_type, value, user, original_query=None):
         super().__init__(label=fixed(label, 20).strip(), style=discord.ButtonStyle.secondary)
         self.radio = radio
-        self.db = db
+        self.db = radio.db
         self.search_type = search_type
         self.value = value
         self.user = user
-        self.original_query = original_query
+        self.original_query = original_query or value
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
-        from ui import init_translate
-        init_translate(self.radio)
+
         await interaction.response.defer()
 
         results = []
@@ -193,7 +181,7 @@ class SearchBySelectionButton(discord.ui.Button):
             existing_paths = {s['path'] for s in playlist_songs}
             all_playlists = await self.db.get_all_playlists()
 
-        view = SearchResultsView(self.radio, self.db, results, str(self.value), self.user, search_type=new_search_type, original_query=self.original_query, existing_paths=existing_paths, all_playlists=all_playlists)
+        view = SearchResultsView(self.radio, results, str(self.value), self.user, search_type=new_search_type, original_query=self.original_query, existing_paths=existing_paths, all_playlists=all_playlists)
         await interaction.edit_original_response(view=view)
 
 class QueueAllButton(discord.ui.Button):
@@ -203,33 +191,31 @@ class QueueAllButton(discord.ui.Button):
         self.radio = radio
         self.songs = songs
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        from ui import init_translate
-        init_translate(self.radio)
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
             await interaction.response.defer(ephemeral=True)
-            from database import DatabaseManager
-            db = DatabaseManager()
             for song in self.songs:
-                await db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
+                await self.radio.db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
             await interaction.followup.send(t('bulk_added_to_playlist').format(count=len(self.songs)), ephemeral=True)
 
             search_id = self.radio.embed_manager.load_message_id("search")
-            if search_id:
+            msg = await safe_fetch_message(interaction.channel, search_id)
+            if msg:
                 try:
-                    msg = await interaction.channel.fetch_message(search_id)
                     if self.radio.active_view_type == "search":
-                        playlist_songs = await db.get_playlist_songs(self.radio.editing_playlist_id)
+                        playlist_songs = await self.radio.db.get_playlist_songs(self.radio.editing_playlist_id)
                         existing_paths = {s['path'] for s in playlist_songs}
-                        all_playlists = await db.get_all_playlists()
-                        view = SearchResultsView(self.radio, db, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type, existing_paths=existing_paths, all_playlists=all_playlists)
+                        all_playlists = await self.radio.db.get_all_playlists()
+                        view = SearchResultsView(self.radio, self.radio.last_search_results, self.radio.last_search_query, self.radio.last_search_user, page=self.radio.last_search_page, search_type=self.radio.last_search_type, existing_paths=existing_paths, all_playlists=all_playlists)
                         await msg.edit(view=view)
                     elif self.radio.active_view_type in ["playlist_editor", "studio"]:
                         from ui_studio import PlaylistEditorView
-                        view = PlaylistEditorView(self.radio, db, self.radio.editing_playlist_id, page=self.radio.last_editor_page)
+                        view = PlaylistEditorView(self.radio, self.radio.editing_playlist_id, page=self.radio.last_editor_page)
                         await msg.edit(view=view)
-                except: pass
+                except Exception as e:
+                    print(f"[UI] Failed to refresh search after bulk add: {e}")
         else:
             await interaction.response.defer(ephemeral=True)
             for song in self.songs:
@@ -238,23 +224,21 @@ class QueueAllButton(discord.ui.Button):
 
 class QueueViewButton(discord.ui.Button):
     def __init__(self, radio):
-        super().__init__(label=None if radio.is_compact else t('full_queue_label'), emoji=Icons.FULL_LIST, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
+        super().__init__(label=None if radio.is_compact else t('edit_queue_label'), emoji=Icons.FULL_LIST, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         self.radio.active_view_type = "queue"
         self.radio.last_queue_page = 0
         view = FullQueueView(self.radio, page=0)
-        from ui import embed_state
-        search_id = embed_state.load_message_id("search")
-        if search_id:
-            try:
-                msg = await interaction.channel.fetch_message(search_id)
-                await msg.delete()
-            except: pass
+        search_id = self.radio.embed_manager.load_message_id("search")
+        msg = await safe_fetch_message(interaction.channel, search_id)
+        if msg:
+            await safe_delete_message(msg)
         msg = await interaction.followup.send(view=view, wait=True)
-        embed_state.save_message_id("search", msg.id)
+        self.radio.embed_manager.save_message_id("search", msg.id)
 
 class RemoveFromQueueButton(discord.ui.Button):
     def __init__(self, radio, song):
@@ -264,25 +248,35 @@ class RemoveFromQueueButton(discord.ui.Button):
         self.radio = radio
         self.song = song
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         self.radio.dispatch(RadioAction.REMOVE_FROM_QUEUE, self.song, user=interaction.user)
-        await interaction.response.send_message(t("song_removed_feedback"), ephemeral=True)
+        if self.view and hasattr(self.view, 'refresh_view'):
+             await self.view.refresh_view(interaction)
 
-
-class SearchResultsView(LayoutView):
-    def __init__(self, radio, db, results, query, user, page=0, search_type="songs", original_query=None, existing_paths=None, all_playlists=None):
-        super().__init__(timeout=None)
+class ClearQueueButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(label=t("clear_queue_label"), emoji=Icons.SWEEP, style=discord.ButtonStyle.danger, custom_id="clear_queue_button")
         self.radio = radio
-        self.db = db
-        self.results = results
+
+    @handle_ui_error
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        self.radio.dispatch(RadioAction.CLEAR_QUEUE, user=interaction.user)
+        
+        if self.view and hasattr(self.view, 'refresh_view'):
+             await self.view.refresh_view(interaction)
+
+class SearchResultsView(PaginatedView):
+    def __init__(self, radio, results, query, user, page=0, search_type="songs", original_query=None, existing_paths=None, all_playlists=None):
+        super().__init__(radio, results, items_per_page=radio.config.search_items_per_page, page=page)
+        self.db = radio.db
         self.query = query
         self.original_query = original_query or query
         self.user = user
-        self.page = page
         self.search_type = search_type
-        self.items_per_page = radio.config.search_items_per_page
-        self.total_pages = (len(results) - 1) // self.items_per_page + 1 if results else 1
-
+        
         self.existing_paths = existing_paths or set()
         self.all_playlists = all_playlists or []
 
@@ -290,19 +284,19 @@ class SearchResultsView(LayoutView):
         container = Container(accent_color=Theme.BACKGROUND)
 
         tab_row = ActionRow()
-        tab_row.add_item(TabButton(radio, db, t("songs_tab"), "songs", self.original_query, user, active=(search_type == "songs")))
-        tab_row.add_item(TabButton(radio, db, t("artists_tab"), "artists", self.original_query, user, active=(search_type == "artists")))
-        tab_row.add_item(TabButton(radio, db, t("albums_tab"), "albums", self.original_query, user, active=(search_type == "albums")))
-        tab_row.add_item(TabButton(radio, db, t("playlists_tab"), "playlists", self.original_query, user, active=(search_type == "playlists")))
+        tab_row.add_item(TabButton(radio, t("songs_tab"), "songs", self.original_query, user, active=(search_type == "songs")))
+        tab_row.add_item(TabButton(radio, t("artists_tab"), "artists", self.original_query, user, active=(search_type == "artists")))
+        tab_row.add_item(TabButton(radio, t("albums_tab"), "albums", self.original_query, user, active=(search_type == "albums")))
+        tab_row.add_item(TabButton(radio, t("playlists_tab"), "playlists", self.original_query, user, active=(search_type == "playlists")))
 
         close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
+        @handle_ui_error
         async def close_callback(interaction):
              if self.radio.editing_playlist_id:
                  if await check_editor_lock(self.radio, interaction): return
              await interaction.response.defer()
-             from ui import embed_state
-             embed_state.save_message_id("search", None)
-             await interaction.message.delete()
+             self.radio.embed_manager.save_message_id("search", None)
+             await safe_delete_message(interaction.message)
         close_btn.callback = close_callback
         tab_row.add_item(close_btn)
         container.add_item(tab_row)
@@ -313,14 +307,12 @@ class SearchResultsView(LayoutView):
             container.add_item(TextDisplay(f"{Icons.STATUS} **{playlist_name}** ({len(self.existing_paths)} {t('songs')})"))
             container.add_item(Separator())
 
-        start = self.page * self.items_per_page
-        end = start + self.items_per_page
-        page_results = self.results[start:end]
+        page_results = self.get_page_items()
 
         if not page_results:
             container.add_item(TextDisplay(f"*{t('search_no_results')}*"))
         else:
-            for i, item in enumerate(page_results, start + 1):
+            for i, item in enumerate(page_results, self.current_page * self.items_per_page + 1):
                 if self.search_type == "songs":
                     is_added = item['path'] in self.existing_paths
                     song_info = f"**{i}. {item['title']}** {item['artist']} • {format_duration(item['duration'])}"
@@ -332,40 +324,43 @@ class SearchResultsView(LayoutView):
                 elif self.search_type == "artists":
                     container.add_item(TextDisplay(f"**{i}. {item}**"))
                     row = ActionRow()
-                    row.add_item(SearchBySelectionButton(radio, db, t("songs_tab"), "artist_songs", item, user, original_query=self.original_query))
-                    row.add_item(SearchBySelectionButton(radio, db, t("albums_tab"), "artist_albums", item, user, original_query=self.original_query))
+                    row.add_item(SearchBySelectionButton(radio, t("songs_tab"), "artist_songs", item, user, original_query=self.original_query))
+                    row.add_item(SearchBySelectionButton(radio, t("albums_tab"), "artist_albums", item, user, original_query=self.original_query))
                     container.add_item(row)
                 elif self.search_type == "albums":
                     album_info = f"**{i}. {item['album']}** {item['artist']}"
-                    container.add_item(Section(album_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "album_songs", (item['artist'], item['album']), user, original_query=self.original_query)))
+                    container.add_item(Section(album_info, accessory=SearchBySelectionButton(radio, t("songs_tab"), "album_songs", (item['artist'], item['album']), user, original_query=self.original_query)))
                 elif self.search_type == "playlists":
                     is_owned = item.get('user_id') == self.user.id
                     prefix = f"{Icons.USER} " if is_owned else ""
                     playlist_info = f"**{i}. {prefix}{item['name']}**"
-                    container.add_item(Section(playlist_info, accessory=SearchBySelectionButton(radio, db, t("songs_tab"), "playlist_songs", item['id'], user, original_query=self.original_query)))
+                    container.add_item(Section(playlist_info, accessory=SearchBySelectionButton(radio, t("songs_tab"), "playlist_songs", item['id'], user, original_query=self.original_query)))
 
-        container.add_item(Separator())
-        footer_text = f"{t('page')} {self.page + 1}/{self.total_pages} • {len(results)} {t('results')} • {t('initiated_by')} {user.mention}"
+        footer_text = f"{self.pagination_info} • {t('initiated_by')} {self.user.mention}"
         container.add_item(TextDisplay(footer_text))
 
         nav_row = ActionRow()
-        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary)
+        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary)
+        self.update_pagination_buttons(prev_btn, next_btn)
+
+        @handle_ui_error
         async def prev_callback(interaction):
             await interaction.response.defer()
-            self.page -= 1
+            self.current_page -= 1
             await self.update_view(interaction)
         prev_btn.callback = prev_callback
-        nav_row.add_item(prev_btn)
 
-        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        @handle_ui_error
         async def next_callback(interaction):
             await interaction.response.defer()
-            self.page += 1
+            self.current_page += 1
             await self.update_view(interaction)
         next_btn.callback = next_callback
-        nav_row.add_item(next_btn)
 
-        nav_row.add_item(QueueAllButton(radio, results))
+        nav_row.add_item(prev_btn)
+        nav_row.add_item(next_btn)
+        nav_row.add_item(QueueAllButton(radio, self.data_list))
 
         if self.radio.editing_playlist_id:
             from ui_studio import BackToEditorButton
@@ -375,7 +370,7 @@ class SearchResultsView(LayoutView):
         self.add_item(container)
 
     async def update_view(self, interaction):
-        self.radio.last_search_page = self.page
+        self.radio.last_search_page = self.current_page
         self.radio.last_search_type = self.search_type
         
         existing_paths = set()
@@ -385,7 +380,7 @@ class SearchResultsView(LayoutView):
             existing_paths = {s['path'] for s in playlist_songs}
             all_playlists = await self.db.get_all_playlists()
 
-        new_view = SearchResultsView(self.radio, self.db, self.results, self.query, self.user, self.page, self.search_type, original_query=self.original_query, existing_paths=existing_paths, all_playlists=all_playlists)
+        new_view = SearchResultsView(self.radio, self.data_list, self.query, self.user, self.current_page, self.search_type, original_query=self.original_query, existing_paths=existing_paths, all_playlists=all_playlists)
         await interaction.edit_original_response(view=new_view)
 
 class MoveSongInQueueButton(discord.ui.Button):
@@ -397,38 +392,35 @@ class MoveSongInQueueButton(discord.ui.Button):
         self.song = song
         self.direction = direction
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
         try:
             curr_idx = self.radio.queue.index(self.song)
             new_idx = curr_idx + self.direction
             if 0 <= new_idx < len(self.radio.queue):
-
                 item = self.radio.queue.pop(curr_idx)
                 self.radio.queue.insert(new_idx, item)
-
-
                 from ui import refresh_all_uis
                 await refresh_all_uis()
-        except: pass
+            else:
+                print(f"[UI] Cannot move song {self.song['title']} in queue: target index {new_idx} out of bounds")
+        except ValueError:
+            print(f"[UI] Cannot move song {self.song['title']} in queue: not found in current queue")
+        except Exception as e:
+            print(f"[UI] Error moving song in queue: {e}")
 
-class FullQueueView(LayoutView):
+class FullQueueView(PaginatedView):
     def __init__(self, radio, page=0):
-        super().__init__(timeout=None)
-        self.radio = radio
-        self.page = page
-        self.items_per_page = radio.config.queue_items_per_page
-        self.queue_list = radio.queue
-        self.total_pages = (len(self.queue_list) - 1) // self.items_per_page + 1 if self.queue_list else 1
+        super().__init__(radio, radio.queue, items_per_page=radio.config.queue_items_per_page)
+        self.current_page = page
 
         container = Container(accent_color=Theme.PRIMARY)
-        if not self.queue_list:
+        if not self.data_list:
             container.add_item(TextDisplay(f"*{t('empty')}*"))
         else:
-            start = self.page * self.items_per_page
-            end = start + self.items_per_page
-            page_results = self.queue_list[start:end]
-            for i, song in enumerate(page_results, start + 1):
+            page_results = self.get_page_items()
+            for i, song in enumerate(page_results, self.current_page * self.items_per_page + 1):
                 song_info = f"**{i}. {song['artist']} - {song['title']}**"
                 row = ActionRow()
                 row.add_item(MoveSongInQueueButton(radio, song, -1, Icons.MOVE_UP))
@@ -438,49 +430,55 @@ class FullQueueView(LayoutView):
                 container.add_item(row)
 
         container.add_item(Separator())
-        footer = f"{t('page')} {self.page + 1}/{self.total_pages} • {len(self.queue_list)} {t('songs')}"
-        container.add_item(TextDisplay(footer))
+        container.add_item(TextDisplay(self.pagination_info))
 
         nav_row = ActionRow()
-        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+        prev_btn = discord.ui.Button(emoji=Icons.PREV, style=discord.ButtonStyle.secondary)
+        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary)
+        self.update_pagination_buttons(prev_btn, next_btn)
+
+        @handle_ui_error
         async def prev_callback(interaction):
             await interaction.response.defer()
-            self.page -= 1
+            self.current_page -= 1
             await self.refresh_view(interaction)
         prev_btn.callback = prev_callback
 
-        next_btn = discord.ui.Button(emoji=Icons.NEXT, style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        @handle_ui_error
         async def next_callback(interaction):
             await interaction.response.defer()
-            self.page += 1
+            self.current_page += 1
             await self.refresh_view(interaction)
         next_btn.callback = next_callback
 
-        last_btn = discord.ui.Button(label=t("last_label"), style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+        last_btn = discord.ui.Button(label=t("last_label"), style=discord.ButtonStyle.secondary)
+        last_btn.disabled = (self.current_page >= self.total_pages - 1)
+        
+        @handle_ui_error
         async def last_callback(interaction):
             await interaction.response.defer()
-            self.page = self.total_pages - 1
+            self.current_page = self.total_pages - 1
             await self.refresh_view(interaction)
         last_btn.callback = last_callback
 
         close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
+        @handle_ui_error
         async def close_callback(interaction):
             await interaction.response.defer()
-            from ui import embed_state
-            embed_state.save_message_id("search", None)
+            self.radio.embed_manager.save_message_id("search", None)
             self.radio.active_view_type = None
-            try: await interaction.message.delete()
-            except: pass
+            await safe_delete_message(interaction.message)
         close_btn.callback = close_callback
 
         nav_row.add_item(prev_btn)
         nav_row.add_item(next_btn)
         nav_row.add_item(last_btn)
+        nav_row.add_item(ClearQueueButton(radio))
         nav_row.add_item(close_btn)
         container.add_item(nav_row)
         self.add_item(container)
 
     async def refresh_view(self, interaction):
-        self.radio.last_queue_page = self.page
-        new_view = FullQueueView(self.radio, page=self.page)
+        self.radio.last_queue_page = self.current_page
+        new_view = FullQueueView(self.radio, page=self.current_page)
         await interaction.edit_original_response(view=new_view)

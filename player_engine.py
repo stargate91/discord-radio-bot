@@ -6,16 +6,14 @@ from ui_icons import Icons
 _bot_ref = None
 _config_ref = None
 _radio_ref = None
-_db_ref = None
 _update_now_playing_fn = None
 _refresh_ui_fn = None
 
-def init_player(bot, config, radio, db, update_fn, refresh_fn):
-    global _bot_ref, _config_ref, _radio_ref, _db_ref, _update_now_playing_fn, _refresh_ui_fn
+def init_player(bot, config, radio, update_fn, refresh_fn):
+    global _bot_ref, _config_ref, _radio_ref, _update_now_playing_fn, _refresh_ui_fn
     _bot_ref = bot
     _config_ref = config
     _radio_ref = radio
-    _db_ref = db
     _update_now_playing_fn = update_fn
     _refresh_ui_fn = refresh_fn
 
@@ -115,8 +113,13 @@ async def radio_player():
                     await _refresh_ui_fn()
                     print(f"[ACTION HANDLED] SET_LANGUAGE: Language set to {data}")
                 elif action == RadioAction.ADD_TO_QUEUE:
-                    _radio_ref.queue.insert(0, data)
-                    print(f"[ACTION HANDLED] ADD_TO_QUEUE: {data.get('title')} added to front of queue")
+                    _radio_ref.queue.append(data)
+                elif action == RadioAction.REMOVE_FROM_QUEUE:
+                    if data in _radio_ref.queue:
+                        _radio_ref.queue.remove(data)
+                elif action == RadioAction.CLEAR_QUEUE:
+                    _radio_ref.queue = []
+                    await _refresh_ui_fn()
 
             if _radio_ref.status == RadioStatusEnum.IDLE:
                 continue
@@ -196,7 +199,7 @@ async def radio_player():
             while not done.is_set():
                 if not history_saved and (asyncio.get_event_loop().time() - start_time >= 2.0):
                     user_id = _radio_ref.last_user.id if _radio_ref.last_user else None
-                    await _db_ref.add_to_history(song["path"], user_id)
+                    await _radio_ref.db.add_to_history(song["path"], user_id)
                     history_saved = True
                 try:
                     action_task = asyncio.create_task(_radio_ref.action_queue.get())
@@ -280,15 +283,9 @@ async def radio_player():
                             voice.stop()
                             break
                         elif action == RadioAction.ADD_TO_QUEUE:
-                            data['manual'] = True
-
-                            _radio_ref.queue = [s for s in _radio_ref.queue if s.get('manual')]
-
                             _radio_ref.queue.append(data)
-
                             await _update_now_playing_fn(song)
-
-                            print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} appended to manual queue")
+                            print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} appended to queue")
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)
@@ -316,10 +313,16 @@ async def radio_player():
                             import random
                             random.shuffle(_radio_ref.queue)
                             await _update_now_playing_fn(song)
+                        elif action == RadioAction.ADD_TO_QUEUE:
+                            _radio_ref.queue.append(data)
+                            await _update_now_playing_fn(song)
                         elif action == RadioAction.REMOVE_FROM_QUEUE:
                             if data in _radio_ref.queue:
                                 _radio_ref.queue.remove(data)
                                 await _update_now_playing_fn(song)
+                        elif action == RadioAction.CLEAR_QUEUE:
+                            _radio_ref.queue = []
+                            await _update_now_playing_fn(song)
 
                     if done_task in finished:
                         break
@@ -330,7 +333,7 @@ async def radio_player():
             elapsed_time = asyncio.get_event_loop().time() - start_time
 
             if elapsed_time >= ten_percent_duration:
-                await _db_ref.update_last_played(song["path"])
+                await _radio_ref.db.update_last_played(song["path"])
                 print(f"Play count updated for: {song['path']}")
 
             raw_source.cleanup()

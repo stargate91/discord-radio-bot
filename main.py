@@ -50,10 +50,10 @@ async def main():
 
     radio = RadioState(config, db)
 
-    init_ui(bot, config, radio, db)
-    init_player(bot, config, radio, db, update_now_playing, refresh_all_uis)
+    init_ui(bot, config, radio)
+    init_player(bot, config, radio, update_now_playing, refresh_all_uis)
 
-    setup_commands(tree, radio, db)
+    setup_commands(tree, radio)
 
     async def embed_refresh_loop():
         await bot.wait_until_ready()
@@ -68,7 +68,7 @@ async def main():
         genres = await db.get_all_genres()
         bot.add_view(UnifiedStandbyView(radio))
         bot.add_view(FrequencyStationView(radio))
-        bot.add_view(NowPlayingView(radio, db, genres=genres))
+        bot.add_view(NowPlayingView(radio, genres=genres))
 
         await force_new_embed()
 

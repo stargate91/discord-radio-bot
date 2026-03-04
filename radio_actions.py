@@ -21,3 +21,4 @@ class RadioAction(Enum):
     FORWARD = auto()
     SHUFFLE = auto()
     REMOVE_FROM_QUEUE = auto()
+    CLEAR_QUEUE = auto()

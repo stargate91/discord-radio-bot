@@ -44,7 +44,7 @@ class MusicLibraryHandler(FileSystemEventHandler):
             return
         
         try:
-            async with self.db._connect() as conn:
+            async with self.db.connect() as conn:
                 if await process_song(p, genre, self.config, self.db, conn):
                     print(f"[MONITOR] Added/Updated: {file_path}")
                     await conn.commit()
@@ -65,8 +65,8 @@ class MusicLibraryHandler(FileSystemEventHandler):
                 folder_path = Path(folder_str).resolve()
                 if str(target).startswith(str(folder_path)):
                     return genre
-        except:
-            pass
+        except Exception as e:
+            print(f"[MONITOR] Genre resolve failed for {file_path}: {e}")
         return None
 
 def start_monitoring(config, db, loop):

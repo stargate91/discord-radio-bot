@@ -15,7 +15,7 @@ class DatabaseManager:
 
     async def initialize(self):
         """Async initialization of the database."""
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("PRAGMA journal_mode=WAL;")
             
             await db.execute("""
@@ -144,7 +144,7 @@ class DatabaseManager:
             await db.commit()
 
     async def is_empty(self) -> bool:
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("SELECT COUNT(*) FROM songs") as cursor:
                 row = await cursor.fetchone()
                 return row[0] == 0
@@ -181,7 +181,7 @@ class DatabaseManager:
         return db.total_changes > 0
 
     async def get_random_song_by_genre(self, genre: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT * FROM songs WHERE genre = ? ORDER BY RANDOM() LIMIT 1
@@ -189,11 +189,11 @@ class DatabaseManager:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
 
-    def _connect(self):
+    def connect(self):
         return aiosqlite.connect(self.db_file)
 
     async def update_last_played(self, song_path: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("""
                 UPDATE songs
                 SET last_played = ?, play_count = play_count + 1
@@ -202,7 +202,7 @@ class DatabaseManager:
             await db.commit()
 
     async def add_to_history(self, song_path: str, user_id: int | None = None):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("""
                 INSERT INTO playback_history (song_path, user_id, timestamp)
                 VALUES (?, ?, ?)
@@ -210,18 +210,18 @@ class DatabaseManager:
             await db.commit()
 
     async def get_metadata(self, key: str, default=None):
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("SELECT value FROM metadata WHERE key = ?", (key,)) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else default
 
     async def set_metadata(self, key: str, value: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", (key, str(value)))
             await db.commit()
 
     async def get_random_song_by_rating(self, min_rating: int = 5):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT * FROM songs WHERE rating >= ? ORDER BY RANDOM() LIMIT 1
@@ -230,7 +230,7 @@ class DatabaseManager:
                 return dict(row) if row else None
 
     async def get_all_genres(self) -> list[str]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("""
                 SELECT DISTINCT genre FROM songs
                 WHERE genre IS NOT NULL AND genre != ''
@@ -240,33 +240,33 @@ class DatabaseManager:
                 return [row[0] for row in rows]
 
     async def get_all_song_paths(self):
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("SELECT path FROM songs") as cursor:
                 rows = await cursor.fetchall()
                 return [row[0] for row in rows]
 
     async def get_song_by_path(self, path: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM songs WHERE path = ?", (path,)) as cursor:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
 
     async def remove_song_by_path(self, path: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("DELETE FROM songs WHERE path = ?", (path,))
             await db.commit()
             return True
 
     async def get_song_by_id(self, song_id: int):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM songs WHERE id = ?", (song_id,)) as cursor:
                 row = await cursor.fetchone()
                 return dict(row) if row else None
 
     async def toggle_rating(self, user_id: int, song_path: str, rating_type: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute(
                 "SELECT rating_type FROM user_ratings WHERE user_id = ? AND song_path = ?",
                 (user_id, song_path)
@@ -306,7 +306,7 @@ class DatabaseManager:
             return status
 
     async def get_song_cover_path(self, song_path: str) -> str | None:
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("SELECT cover_path FROM song_covers WHERE song_path = ?", (song_path,)) as cursor:
                 row = await cursor.fetchone()
                 return row[0] if row else None
@@ -319,7 +319,7 @@ class DatabaseManager:
             """, (song_path, cover_path))
             return
 
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("""
                 INSERT OR REPLACE INTO song_covers (song_path, cover_path)
                 VALUES (?, ?)
@@ -327,7 +327,7 @@ class DatabaseManager:
             await db.commit()
 
     async def search_songs(self, query: str) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             
             fts_query = query.replace('"', "").replace("'", "")
@@ -346,8 +346,11 @@ class DatabaseManager:
                 async with db.execute(sql, (prepared_query,)) as cursor:
                     rows = await cursor.fetchall()
                     if rows: return [dict(row) for row in rows]
-            except:
-                pass
+            except sqlite3.OperationalError as e:
+                # FTS5 might fail on complex syntax even after sanitization
+                print(f"[DB] FTS5 search failed for query '{query}': {e}")
+            except Exception as e:
+                print(f"[DB] Unexpected error in FTS5 search: {e}")
 
             words = query.split()
             where_clauses = []
@@ -364,7 +367,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def search_by_artist(self, artist: str) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT * FROM songs WHERE artist = ? ORDER BY title ASC
@@ -373,7 +376,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def search_artists(self, query: str) -> list[str]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             search_pattern = f"%{query}%"
             start_pattern = f"{query}%"
             sql = """
@@ -392,7 +395,7 @@ class DatabaseManager:
                 return [row[0] for row in rows]
 
     async def search_albums(self, query: str) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             search_pattern = f"%{query}%"
             start_pattern = f"{query}%"
@@ -412,7 +415,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def search_by_album(self, artist: str, album: str) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT * FROM songs WHERE artist = ? AND album = ? ORDER BY title ASC
@@ -421,7 +424,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def get_albums_by_artist(self, artist: str) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT DISTINCT artist, album FROM songs WHERE artist = ? ORDER BY album ASC
@@ -431,7 +434,7 @@ class DatabaseManager:
 
     async def get_previous_song(self, exclude_paths: list[str] = []) -> dict | None:
         import os
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             placeholders = ",".join(["?"] * len(exclude_paths)) if exclude_paths else "''"
             query = f"""
@@ -453,7 +456,7 @@ class DatabaseManager:
 
     async def get_full_history(self, limit=10, offset=0, filter_from=None, filter_to=None) -> list[dict]:
         from datetime import datetime
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             where_clauses = []
             params = []
@@ -482,7 +485,7 @@ class DatabaseManager:
 
     async def get_history_count(self, filter_from=None, filter_to=None) -> int:
         from datetime import datetime
-        async with self._connect() as db:
+        async with self.connect() as db:
             where_clauses = []
             params = []
 
@@ -503,12 +506,12 @@ class DatabaseManager:
                 return row[0]
 
     async def clear_history(self):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("DELETE FROM playback_history")
             await db.commit()
 
     async def create_playlist(self, name: str, user_id: int) -> int:
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute(
                 "INSERT INTO playlists (name, user_id, created_at) VALUES (?, ?, ?)",
                 (name, user_id, int(time.time()))
@@ -517,7 +520,7 @@ class DatabaseManager:
                 return cursor.lastrowid
 
     async def get_all_playlists(self, user_id: int | None = None, strictly_personal: bool = False) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             if strictly_personal and user_id:
                 sql = "SELECT * FROM playlists WHERE user_id = ? ORDER BY name ASC"
@@ -537,7 +540,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def get_playlist_songs(self, playlist_id: int) -> list[dict]:
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             sql = """
                 SELECT s.*, ps.position FROM playlist_songs ps
@@ -549,7 +552,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def add_song_to_playlist(self, playlist_id: int, song_path: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("SELECT MAX(position) FROM playlist_songs WHERE playlist_id = ?", (playlist_id,)) as cursor:
                 res = await cursor.fetchone()
                 max_pos = res[0] or 0
@@ -560,23 +563,23 @@ class DatabaseManager:
             await db.commit()
 
     async def remove_song_from_playlist(self, playlist_id: int, song_path: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("DELETE FROM playlist_songs WHERE playlist_id = ? AND song_path = ?", (playlist_id, song_path))
             await db.commit()
 
     async def delete_playlist(self, playlist_id: int):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("DELETE FROM playlists WHERE id = ?", (playlist_id,))
             await db.execute("DELETE FROM playlist_songs WHERE playlist_id = ?", (playlist_id,))
             await db.commit()
 
     async def rename_playlist(self, playlist_id: int, new_name: str):
-        async with self._connect() as db:
+        async with self.connect() as db:
             await db.execute("UPDATE playlists SET name = ? WHERE id = ?", (new_name, playlist_id))
             await db.commit()
 
     async def move_song_in_playlist(self, playlist_id: int, song_path: str, direction: int):
-        async with self._connect() as db:
+        async with self.connect() as db:
             async with db.execute("SELECT position FROM playlist_songs WHERE playlist_id = ? AND song_path = ?", (playlist_id, song_path)) as cursor:
                 row = await cursor.fetchone()
                 if not row: return
@@ -594,7 +597,7 @@ class DatabaseManager:
             await db.commit()
 
     async def get_top_artists(self, days=7, limit=5):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             where_clause = ""
             params = []
@@ -614,7 +617,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def get_top_songs(self, days=7, limit=5):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             where_clause = ""
             params = []
@@ -634,7 +637,7 @@ class DatabaseManager:
                 return [dict(row) for row in rows]
 
     async def get_top_users(self, days=7, limit=5):
-        async with self._connect() as db:
+        async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             where_clause = "WHERE user_id IS NOT NULL"
             params = []

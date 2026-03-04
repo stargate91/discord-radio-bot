@@ -38,7 +38,7 @@ def get_cover_art(file_path: Path) -> bytes | None:
 
     return None
 
-async def find_and_save_cover(file_path: Path, db) -> str | None:
+async def find_and_save_cover(file_path: Path) -> str | None:
     folder = file_path.parent
     cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
 
@@ -177,7 +177,7 @@ async def process_song(full_path: Path, genre: str, config, db, conn, force=Fals
     })
 
     if inserted_flag:
-        cover_art_path = await find_and_save_cover(full_path, db)
+        cover_art_path = await find_and_save_cover(full_path)
         if cover_art_path:
             await db.save_song_cover_path(str(full_path), cover_art_path, db=conn)
     return inserted_flag
@@ -185,16 +185,25 @@ async def process_song(full_path: Path, genre: str, config, db, conn, force=Fals
 async def scan_music_library(config, db, force=False):
     inserted = 0
     skipped = 0
+    batch_size = 500
+    count = 0
 
-    async with db._connect() as conn:
+    print(f"[SCAN] Starting music library scan (Batch size: {batch_size})...")
+
+    async with db.connect() as conn:
         for genre, paths in config.genres.items():
+            print(f"[SCAN] Current Genre: {genre.upper()}")
             for base_path in paths:
                 base_path = Path(base_path)
                 if not base_path.exists():
-                    print(f" Missing path: {base_path}")
+                    print(f" [SCAN] Missing path: {base_path}")
                     continue
+                
+                print(f" [SCAN] Path: {base_path}")
 
                 for root, _, files in os.walk(base_path):
+                    if files:
+                        print(f"  [SCAN] Processing directory: {root}")
                     for file in files:
                         ext = Path(file).suffix.lower().replace(".", "")
                         if ext not in config.supported_extensions:
@@ -205,9 +214,15 @@ async def scan_music_library(config, db, force=False):
                             inserted += 1
                         else:
                             skipped += 1
+                        
+                        count += 1
+                        if count % 100 == 0:
+                            await conn.commit()
+                            print(f"   [SCAN] Progress: {count} files scanned... (Added: {inserted}, Skipped: {skipped})")
 
         await conn.commit()
 
+    print(f"[SCAN] Scan finished. Total: {count}, Added: {inserted}, Skipped: {skipped}")
     return inserted, skipped
 
 async def cleanup_database(db):

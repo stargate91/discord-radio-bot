@@ -3,6 +3,7 @@ from discord.ui import Modal, TextInput, LayoutView, ActionRow, Container, Secti
 from pathlib import Path
 from ui_translate import t
 from ui_icons import Icons
+from ui_base import handle_ui_error, BaseView
 from ui_utils import fixed, format_duration
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from ui_theme import Theme
@@ -35,6 +36,7 @@ class StationSelect(discord.ui.Select):
             custom_id="station_select"
         )
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         channel_id = int(self.values[0])
         user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
@@ -64,6 +66,7 @@ class LanguageSelect(discord.ui.Select):
             custom_id="language_select"
         )
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
         self.radio.language = selected
@@ -86,6 +89,7 @@ class UIModeSelect(discord.ui.Select):
             custom_id="ui_mode_select"
         )
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
         self.radio.is_compact = (selected == "compact")
@@ -104,15 +108,15 @@ class DisconnectButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         self.radio.dispatch(RadioAction.DISCONNECT, user=interaction.user)
         await interaction.response.send_message(t("severing"), ephemeral=True)
 
 class GenreSelect(discord.ui.Select):
-    def __init__(self, radio, db, genres):
+    def __init__(self, radio, genres):
         self.radio = radio
-        self.db = db
-        
+        self.db = radio.db
         
         if "levifav" not in genres:
             genres.insert(0, "levifav")
@@ -130,6 +134,7 @@ class GenreSelect(discord.ui.Select):
             custom_id="genre_select"
         )
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
         self.radio.dispatch(RadioAction.SET_GENRE, selected, user=interaction.user)
@@ -149,6 +154,7 @@ class PlayPauseButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.status == RadioStatusEnum.PAUSED or self.radio.status == RadioStatusEnum.IDLE:
             self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
@@ -167,6 +173,7 @@ class StopButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         self.radio.dispatch(RadioAction.STOP, user=interaction.user)
         await interaction.response.send_message(t("stopping"), ephemeral=True)
@@ -181,6 +188,7 @@ class ForwardButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
             self.radio.dispatch(RadioAction.FORWARD, user=interaction.user)
@@ -198,6 +206,7 @@ class RandomButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
             self.radio.dispatch(RadioAction.SKIP, user=interaction.user)
@@ -215,12 +224,13 @@ class ShuffleButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         self.radio.dispatch(RadioAction.SHUFFLE, user=interaction.user)
         await interaction.response.send_message(t("shuffle_feedback"), ephemeral=True)
 
 class BackButton(discord.ui.Button):
-    def __init__(self, radio, db):
+    def __init__(self, radio):
         super().__init__(
             label=None if radio.is_compact else t('back_label'),
             emoji=Icons.BACK_STEP,
@@ -228,8 +238,9 @@ class BackButton(discord.ui.Button):
             custom_id="back_button"
         )
         self.radio = radio
-        self.db = db
+        self.db = radio.db
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         import time
         now = time.time()
@@ -258,6 +269,7 @@ class SeekButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if self.radio.status == RadioStatusEnum.IDLE:
             await interaction.response.send_message(t("cannot_seek_stopped"), ephemeral=True)
@@ -278,6 +290,7 @@ class SeekModal(Modal):
         )
         self.add_item(self.timestamp_input)
 
+    @handle_ui_error
     async def on_submit(self, interaction: discord.Interaction):
         ts = self.timestamp_input.value
         try:
@@ -305,6 +318,7 @@ class VolumeButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         modal = VolumeModal(self.radio)
         await interaction.response.send_modal(modal)
@@ -322,6 +336,7 @@ class VolumeModal(Modal):
         )
         self.add_item(self.volume_input)
 
+    @handle_ui_error
     async def on_submit(self, interaction: discord.Interaction):
         try:
             value = int(self.volume_input.value)
@@ -335,7 +350,7 @@ class VolumeModal(Modal):
         await interaction.response.send_message(f"{t('vol_set')} {value}%", ephemeral=True)
 
 class LikeButton(discord.ui.Button):
-    def __init__(self, radio, db):
+    def __init__(self, radio):
         super().__init__(
             label=None if radio.is_compact else t('like_label'),
             emoji=Icons.LIKE,
@@ -343,33 +358,30 @@ class LikeButton(discord.ui.Button):
             custom_id="like_button"
         )
         self.radio = radio
-        self.db = db
+        self.db = radio.db
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if not self.radio.current_song:
             await interaction.response.send_message(t("no_playing_error"), ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
         song_path = self.radio.current_song.get("path")
-        try:
-            status = await self.db.toggle_rating(interaction.user.id, song_path, 'like')
-            updated_song = await self.db.get_song_by_path(song_path)
-            if updated_song:
-                self.radio.last_user = interaction.user
-                self.radio.current_song = updated_song
-                if _update_callback: await _update_callback(updated_song)
-            artist = updated_song.get("artist") or "Unknown Artist"
-            title = updated_song.get("title") or "Unknown Title"
-            if status == "added": msg = f"{t('liked')} **{artist} - {title}**"
-            elif status == "removed": msg = f"{t('like_withdrawn')} **{artist} - {title}**"
-            else: msg = f"{t('liked_replaced')} **{artist} - {title}**"
-            await interaction.followup.send(msg, ephemeral=True)
-        except Exception as e:
-            print(f"Like error: {e}")
-            await interaction.followup.send(t("record_error"), ephemeral=True)
+        status = await self.db.toggle_rating(interaction.user.id, song_path, 'like')
+        updated_song = await self.db.get_song_by_path(song_path)
+        if updated_song:
+            self.radio.last_user = interaction.user
+            self.radio.current_song = updated_song
+            if _update_callback: await _update_callback(updated_song)
+        artist = updated_song.get("artist") or "Unknown Artist"
+        title = updated_song.get("title") or "Unknown Title"
+        if status == "added": msg = f"{t('liked')} **{artist} - {title}**"
+        elif status == "removed": msg = f"{t('like_withdrawn')} **{artist} - {title}**"
+        else: msg = f"{t('liked_replaced')} **{artist} - {title}**"
+        await interaction.followup.send(msg, ephemeral=True)
 
 class DislikeButton(discord.ui.Button):
-    def __init__(self, radio, db):
+    def __init__(self, radio):
         super().__init__(
             label=None if radio.is_compact else t('dislike_label'),
             emoji=Icons.DISLIKE,
@@ -377,30 +389,27 @@ class DislikeButton(discord.ui.Button):
             custom_id="dislike_button"
         )
         self.radio = radio
-        self.db = db
+        self.db = radio.db
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         if not self.radio.current_song:
             await interaction.response.send_message(t("no_playing_error"), ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
         song_path = self.radio.current_song.get("path")
-        try:
-            status = await self.db.toggle_rating(interaction.user.id, song_path, 'dislike')
-            updated_song = await self.db.get_song_by_path(song_path)
-            if updated_song:
-                self.radio.last_user = interaction.user
-                self.radio.current_song = updated_song
-                if _update_callback: await _update_callback(updated_song)
-            artist = updated_song.get("artist") or "Unknown Artist"
-            title = updated_song.get("title") or "Unknown Title"
-            if status == "added": msg = f"{t('disliked')} **{artist} - {title}**"
-            elif status == "removed": msg = f"{t('dislike_withdrawn')} **{artist} - {title}**"
-            else: msg = f"{t('disliked_replaced')} **{artist} - {title}**"
-            await interaction.followup.send(msg, ephemeral=True)
-        except Exception as e:
-            print(f"Dislike error: {e}")
-            await interaction.followup.send(t("record_error"), ephemeral=True)
+        status = await self.db.toggle_rating(interaction.user.id, song_path, 'dislike')
+        updated_song = await self.db.get_song_by_path(song_path)
+        if updated_song:
+            self.radio.last_user = interaction.user
+            self.radio.current_song = updated_song
+            if _update_callback: await _update_callback(updated_song)
+        artist = updated_song.get("artist") or "Unknown Artist"
+        title = updated_song.get("title") or "Unknown Title"
+        if status == "added": msg = f"{t('disliked')} **{artist} - {title}**"
+        elif status == "removed": msg = f"{t('dislike_withdrawn')} **{artist} - {title}**"
+        else: msg = f"{t('disliked_replaced')} **{artist} - {title}**"
+        await interaction.followup.send(msg, ephemeral=True)
 
 class DetailsButton(discord.ui.Button):
     def __init__(self, radio):
@@ -412,6 +421,7 @@ class DetailsButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         self.radio.show_details = not self.radio.show_details
@@ -431,6 +441,7 @@ class QueueToggleButton(discord.ui.Button):
         )
         self.radio = radio
 
+    @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         self.radio.show_queue = not self.radio.show_queue
@@ -440,10 +451,9 @@ class QueueToggleButton(discord.ui.Button):
             ephemeral=True
         )
 
-class UnifiedStandbyView(LayoutView):
+class UnifiedStandbyView(BaseView):
     def __init__(self, radio):
-        super().__init__(timeout=None)
-        self.radio = radio
+        super().__init__(radio)
 
         station_container = Container(accent_color=Theme.BACKGROUND)
         station_container.add_item(TextDisplay(f"**{t('system_sync')}**\n{t('synchro_subtitle')}"))
@@ -477,10 +487,9 @@ class UnifiedStandbyView(LayoutView):
         standby_container.add_item(TextDisplay(f"**{t('standby_mode')}**\n{t('standby_subtitle')}"))
         self.add_item(standby_container)
 
-class FrequencyStationView(LayoutView):
+class FrequencyStationView(BaseView):
     def __init__(self, radio):
-        super().__init__(timeout=None)
-        self.radio = radio
+        super().__init__(radio)
 
         station_container = Container(accent_color=Theme.BACKGROUND)
         station_container.add_item(TextDisplay(f"**{t('system_sync')}**\n{t('synchro_subtitle')}"))
@@ -508,9 +517,10 @@ class FrequencyStationView(LayoutView):
 
         self.add_item(station_container)
 
-class NowPlayingView(LayoutView):
-    def __init__(self, radio, db, genres=None, song=None, cover_path=None):
-        super().__init__(timeout=None)
+class NowPlayingView(BaseView):
+    def __init__(self, radio, genres=None, song=None, cover_path=None):
+        super().__init__(radio)
+        db = radio.db
         genres = genres or []
         song = song or radio.current_song or {}
 
@@ -528,7 +538,6 @@ class NowPlayingView(LayoutView):
         status_title = f"{status_emoji} {t(status_key)}"
 
         master_container = Container(accent_color=accent_color)
-
 
         thumb = None
         if cover_path and Path(cover_path).exists():
@@ -587,12 +596,12 @@ class NowPlayingView(LayoutView):
 
         master_container.add_item(Separator())
         genre_row = ActionRow()
-        genre_row.add_item(GenreSelect(radio, db, genres))
+        genre_row.add_item(GenreSelect(radio, genres))
         master_container.add_item(genre_row)
         master_container.add_item(Separator())
 
         playback_row = ActionRow()
-        playback_row.add_item(BackButton(radio, db))
+        playback_row.add_item(BackButton(radio))
         playback_row.add_item(PlayPauseButton(radio))
         playback_row.add_item(StopButton(radio))
         playback_row.add_item(ForwardButton(radio))
@@ -608,20 +617,20 @@ class NowPlayingView(LayoutView):
         master_container.add_item(config_row)
 
         library_row = ActionRow()
-        library_row.add_item(LikeButton(radio, db))
-        library_row.add_item(DislikeButton(radio, db))
+        library_row.add_item(LikeButton(radio))
+        library_row.add_item(DislikeButton(radio))
         from ui_search import SearchButton
         from ui_studio import PlaylistViewButton, HistoryButton
-        library_row.add_item(SearchButton(radio, db))
-        library_row.add_item(PlaylistViewButton(radio, db))
-        library_row.add_item(HistoryButton(radio, db))
+        library_row.add_item(SearchButton(radio))
+        library_row.add_item(PlaylistViewButton(radio))
+        library_row.add_item(HistoryButton(radio))
         master_container.add_item(library_row)
 
         tools_row = ActionRow()
         from ui_search import QueueViewButton
         from ui_studio import StatsButton
         tools_row.add_item(QueueViewButton(radio))
-        tools_row.add_item(StatsButton(radio, db))
+        tools_row.add_item(StatsButton(radio))
         master_container.add_item(tools_row)
 
         self.add_item(master_container)
