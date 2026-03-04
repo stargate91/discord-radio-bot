@@ -27,14 +27,14 @@ class Config:
         )
         self.genres = data.get("genres", {})
         self.ffmpeg_path = data.get("ffmpeg_path", "ffmpeg")
-        
-        # Roles and Permissions
+
+
         self.admin_role_id = int(data.get("admin_role_id", 0))
         self.restricted_channels = {
             int(k): int(v) for k, v in data.get("restricted_channels", {}).items()
         }
-        
-        # UI Settings
+
+
         ui_settings = data.get("ui_settings", {})
         self.search_items_per_page = ui_settings.get("search_items_per_page", 5)
         self.history_items_per_page = ui_settings.get("history_items_per_page", 5)
@@ -43,8 +43,8 @@ class Config:
         self.queue_refresh_limit = ui_settings.get("queue_refresh_limit", 11)
         self.player_upcoming_limit = ui_settings.get("player_upcoming_limit", 5)
         self.levifav_min_rating = ui_settings.get("levifav_min_rating", 5)
-        
-        # Theme Settings
+
+
         theme_data = ui_settings.get("theme", {})
         self.theme_primary = int(theme_data.get("primary", "0x5865F2"), 16)
         self.theme_secondary = int(theme_data.get("secondary", "0x2b2d31"), 16)

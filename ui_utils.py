@@ -7,5 +7,5 @@ def fixed(text: str, length: int = 42):
 
     if len(text) > length:
         return text[:length - 3] + "..."
-    
+
     return text.ljust(length)

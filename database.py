@@ -53,7 +53,7 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_album ON songs(album)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_title ON songs(title)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_date ON songs(date)")
-            
+
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS song_covers (
                 song_path TEXT PRIMARY KEY,
@@ -212,16 +212,25 @@ class DatabaseManager:
             row = cursor.fetchone()
             return dict(row) if row else None
 
+    def get_song_by_id(self, song_id: int):
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT * FROM songs WHERE id = ?", (song_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
     def toggle_rating(self, user_id: int, song_path: str, rating_type: str):
         with self._connect() as conn:
             cursor = conn.cursor()
-            
+
             cursor.execute(
                 "SELECT rating_type FROM user_ratings WHERE user_id = ? AND song_path = ?",
                 (user_id, song_path)
             )
             existing = cursor.fetchone()
-            
+
             status = ""
             if existing:
                 existing_type = existing[0]
@@ -250,7 +259,7 @@ class DatabaseManager:
                 column = "likes" if rating_type == "like" else "dislikes"
                 cursor.execute(f"UPDATE songs SET {column} = {column} + 1 WHERE path = ?", (song_path,))
                 status = "added"
-                
+
             conn.commit()
             return status
 
@@ -282,24 +291,42 @@ class DatabaseManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            search_pattern = f"%{query}%"
-            start_pattern = f"{query}%"
-            
-            cursor.execute("""
-                SELECT *,
-                    CASE 
-                        WHEN artist = ? OR title = ? THEN 1
-                        WHEN artist LIKE ? OR title LIKE ? THEN 2
-                        ELSE 3
-                    END as priority
-                FROM songs
-                WHERE artist LIKE ? 
-                   OR title LIKE ? 
-                   OR album LIKE ? 
-                   OR date LIKE ?
-                ORDER BY priority ASC, artist ASC, title ASC
-            """, (query, query, start_pattern, start_pattern, search_pattern, search_pattern, search_pattern, search_pattern))
+            words = query.split()
+            if not words:
+                return []
 
+            where_clauses = []
+            params = []
+            for word in words:
+                pattern = f"%{word}%"
+                where_clauses.append("(artist LIKE ? OR title LIKE ? OR album LIKE ? OR date LIKE ?)")
+                params.extend([pattern, pattern, pattern, pattern])
+
+            where_sql = " AND ".join(where_clauses)
+
+
+            full_pattern = f"%{query}%"
+            start_pattern = f"{query}%"
+
+            priority_sql = """
+                CASE
+                    WHEN artist = ? OR title = ? THEN 1
+                    WHEN artist LIKE ? OR title LIKE ? THEN 2
+                    ELSE 3
+                END as priority
+            """
+
+            sql = f"""
+                SELECT *, {priority_sql}
+                FROM songs
+                WHERE {where_sql}
+                ORDER BY priority ASC, artist ASC, title ASC
+            """
+
+
+            all_params = [query, query, start_pattern, start_pattern] + params
+
+            cursor.execute(sql, tuple(all_params))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
@@ -325,7 +352,7 @@ class DatabaseManager:
             start_pattern = f"{query}%"
             cursor.execute("""
                 SELECT DISTINCT artist,
-                    CASE 
+                    CASE
                         WHEN artist = ? THEN 1
                         WHEN artist LIKE ? THEN 2
                         ELSE 3
@@ -344,7 +371,7 @@ class DatabaseManager:
             start_pattern = f"{query}%"
             cursor.execute("""
                 SELECT DISTINCT artist, album,
-                    CASE 
+                    CASE
                         WHEN album = ? THEN 1
                         WHEN album LIKE ? THEN 2
                         ELSE 3
@@ -384,10 +411,10 @@ class DatabaseManager:
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             placeholders = ",".join(["?"] * len(exclude_paths)) if exclude_paths else "''"
             query = f"""
-                SELECT DISTINCT s.path, s.* 
+                SELECT DISTINCT s.path, s.*
                 FROM playback_history h
                 JOIN songs s ON h.song_path = s.path
                 WHERE h.song_path NOT IN ({placeholders})
@@ -396,12 +423,12 @@ class DatabaseManager:
             """
             cursor.execute(query, tuple(exclude_paths))
             rows = cursor.fetchall()
-            
+
             for row in rows:
                 song = dict(row)
                 if os.path.exists(song["path"]):
                     return song
-                    
+
             return None
 
     def get_full_history(self, limit=10, offset=0, filter_from=None, filter_to=None) -> list[dict]:
@@ -409,22 +436,22 @@ class DatabaseManager:
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             where_clauses = []
             params = []
-            
+
             if filter_from:
                 dt_from = datetime.strptime(filter_from.replace('.', '-'), '%Y-%m-%d')
                 where_clauses.append("h.timestamp >= ?")
                 params.append(dt_from.timestamp())
-            
+
             if filter_to:
                 dt_to = datetime.strptime(filter_to.replace('.', '-'), '%Y-%m-%d').replace(hour=23, minute=59, second=59)
                 where_clauses.append("h.timestamp <= ?")
                 params.append(dt_to.timestamp())
-            
+
             where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-            
+
             sql = f"""
                 SELECT s.*, h.timestamp as played_at
                 FROM playback_history h
@@ -434,7 +461,7 @@ class DatabaseManager:
                 LIMIT ? OFFSET ?
             """
             params.extend([limit, offset])
-            
+
             cursor.execute(sql, tuple(params))
             return [dict(row) for row in cursor.fetchall()]
 
@@ -442,22 +469,22 @@ class DatabaseManager:
         from datetime import datetime
         with self._connect() as conn:
             cursor = conn.cursor()
-            
+
             where_clauses = []
             params = []
-            
+
             if filter_from:
                 dt_from = datetime.strptime(filter_from.replace('.', '-'), '%Y-%m-%d')
                 where_clauses.append("timestamp >= ?")
                 params.append(dt_from.timestamp())
-            
+
             if filter_to:
                 dt_to = datetime.strptime(filter_to.replace('.', '-'), '%Y-%m-%d').replace(hour=23, minute=59, second=59)
                 where_clauses.append("timestamp <= ?")
                 params.append(dt_to.timestamp())
-            
+
             where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-            
+
             sql = f"SELECT COUNT(*) FROM playback_history {where_sql}"
             cursor.execute(sql, tuple(params))
             return cursor.fetchone()[0]
@@ -485,9 +512,9 @@ class DatabaseManager:
             if strictly_personal and user_id:
                 cursor.execute("SELECT * FROM playlists WHERE user_id = ? ORDER BY name ASC", (user_id,))
             elif user_id:
-                # Order by: first own playlists (0), then others (1). Within those, alphabetical by name.
+
                 cursor.execute("""
-                    SELECT * FROM playlists 
+                    SELECT * FROM playlists
                     ORDER BY (CASE WHEN user_id = ? THEN 0 ELSE 1 END) ASC, name ASC
                 """, (user_id,))
             else:
@@ -499,7 +526,7 @@ class DatabaseManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT s.*, ps.position 
+                SELECT s.*, ps.position
                 FROM playlist_songs ps
                 JOIN songs s ON ps.song_path = s.path
                 WHERE ps.playlist_id = ?
@@ -551,6 +578,6 @@ class DatabaseManager:
             other = cursor.fetchone()
             if other:
                 cursor.execute("UPDATE playlist_songs SET position = ? WHERE playlist_id = ? AND song_path = ?", (curr_pos, playlist_id, other[0]))
-            
+
             cursor.execute("UPDATE playlist_songs SET position = ? WHERE playlist_id = ? AND song_path = ?", (new_pos, playlist_id, song_path))
             conn.commit()

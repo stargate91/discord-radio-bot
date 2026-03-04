@@ -27,7 +27,7 @@ async def ensure_voice():
     channel = guild.get_channel(_radio_ref.voice_channel_id)
 
     if not channel:
-        print("❌ Voice channel not found")
+        print("Voice channel not found")
         return None
 
     if guild.voice_client:
@@ -82,7 +82,7 @@ async def radio_player():
                     continue
                 else:
                     continue
-                
+
                 _radio_ref.status = RadioStatusEnum.PLAYING
 
             while _radio_ref.action_queue.qsize() > 0:
@@ -126,17 +126,17 @@ async def radio_player():
             else:
                 if not _radio_ref.queue:
                     _radio_ref.refresh_queue()
-                
+
                 if _radio_ref.queue:
                     song = _radio_ref.queue.pop(0)
-                    
+
                     if not _radio_ref.is_back_action and not _radio_ref.is_forward_action:
                         _radio_ref.last_history_paths = []
                         _radio_ref.forward_stack = []
-                    
+
                     _radio_ref.is_back_action = False
                     _radio_ref.is_forward_action = False
-                    
+
                     new_song = _radio_ref.get_random_song_by_genre(_radio_ref.genre)
                     if new_song:
                         _radio_ref.queue.append(new_song)
@@ -144,17 +144,17 @@ async def radio_player():
                     song = None
 
                 _radio_ref.current_song = song
-            
+
             _radio_ref.is_seeking = False
 
             if not song:
-                print(f"{Icons.CLOSE} There is no track in this:", _radio_ref.genre)
+                print("There is no track in this:", _radio_ref.genre)
                 _radio_ref.status = RadioStatusEnum.IDLE
                 await asyncio.sleep(5)
                 continue
 
             _radio_ref.status = RadioStatusEnum.PLAYING
-            print(f"{Icons.PLAY} Playing:", song)
+            print("Playing:", song)
 
             before_opts = "-nostdin -re"
             if _radio_ref.seek_position is not None:
@@ -201,7 +201,7 @@ async def radio_player():
                 try:
                     action_task = asyncio.create_task(_radio_ref.action_queue.get())
                     done_task = asyncio.create_task(done.wait())
-                    
+
                     finished, pending = await asyncio.wait(
                         [action_task, done_task],
                         return_when=asyncio.FIRST_COMPLETED,
@@ -214,7 +214,7 @@ async def radio_player():
                     if action_task in finished:
                         action, data = action_task.result()
                         print(f"[PROCESS] Action: {action.name}")
-                        
+
                         if action == RadioAction.SKIP:
                             _radio_ref.is_seeking = False
                             _radio_ref.forward_stack = []
@@ -281,18 +281,18 @@ async def radio_player():
                             break
                         elif action == RadioAction.ADD_TO_QUEUE:
                             data['manual'] = True
-                            
+
                             _radio_ref.queue = [s for s in _radio_ref.queue if s.get('manual')]
-                            
+
                             _radio_ref.queue.append(data)
-                            
+
                             await _update_now_playing_fn(song)
-                            
+
                             print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} appended to manual queue")
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)
-                            
+
                             _radio_ref.queue.insert(0, data)
                             _radio_ref.is_seeking = False
                             _radio_ref.is_back_action = True
@@ -304,12 +304,12 @@ async def radio_player():
                                 next_song = _radio_ref.forward_stack.pop()
                                 _radio_ref.queue.insert(0, next_song)
                                 _radio_ref.is_forward_action = True
-                                
+
                                 if _radio_ref.last_history_paths:
                                     _radio_ref.last_history_paths.pop()
                             else:
                                 _radio_ref.is_forward_action = False
-                            
+
                             voice.stop()
                             break
                         elif action == RadioAction.SHUFFLE:
@@ -320,7 +320,7 @@ async def radio_player():
                             if data in _radio_ref.queue:
                                 _radio_ref.queue.remove(data)
                                 await _update_now_playing_fn(song)
-                    
+
                     if done_task in finished:
                         break
 
@@ -331,7 +331,7 @@ async def radio_player():
 
             if elapsed_time >= ten_percent_duration:
                 _db_ref.update_last_played(song["path"])
-                print(f"✓ Play count updated for: {song['path']}")
+                print(f"Play count updated for: {song['path']}")
 
             raw_source.cleanup()
 

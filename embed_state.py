@@ -13,7 +13,7 @@ class EmbedStateManager:
     def save_value(self, key: str, value):
         data = self._load_data()
         data[key] = value
-        
+
         temp_file = self.file_path.with_suffix(".tmp")
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f)

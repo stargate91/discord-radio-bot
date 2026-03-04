@@ -1,17 +1,17 @@
 class Theme:
-    # Core Colors
+
     PRIMARY = 0x5865F2
     SECONDARY = 0x2b2d31
     SUCCESS = 0x5865F2
     WARNING = 0xFEE75C
     DANGER = 0xED4245
 
-    # Specialized Colors
+
     IDLE = 0xED4245
     PAUSED = 0xFEE75C
     PLAYING = 0x5865F2
 
-    # UI Element specific mapping
+
     BACKGROUND = 0x2b2d31
     ACCENT = 0x5865F2
 

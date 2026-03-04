@@ -139,7 +139,10 @@ LOCALES = {
         "rename_playlist_modal_title": "Rename Playlist",
         "ui_mode_label": "Interface Style",
         "ui_mode_full": "Full Interface (Icons + Labels)",
-        "ui_mode_compact": "Compact Interface (Icons only)"
+        "ui_mode_compact": "Compact Interface (Icons only)",
+        "rescan_label": "Rescan Library",
+        "rescanning": "Scanning music library... Please wait.",
+        "rescan_complete": "Scan complete! Found {inserted} new tracks, skipped {skipped}."
     },
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
@@ -278,7 +281,10 @@ LOCALES = {
         "studio_locked_message": "A Playlist Stúdiót jelenleg {user} használja. Kérlek várd meg, amíg befejezi.",
         "ui_mode_label": "Kezelőfelület stílusa",
         "ui_mode_full": "Teljes felület (Ikonok + Szöveg)",
-        "ui_mode_compact": "Kompakt felület (Csak ikonok)"
+        "ui_mode_compact": "Kompakt felület (Csak ikonok)",
+        "rescan_label": "Könyvtár Újraszkennelés",
+        "rescanning": "Zenetár szkennelése... Kérlek várj.",
+        "rescan_complete": "Szkennelés kész! {inserted} új dal hozzáadva, {skipped} kihagyva."
     }
 }
 
@@ -293,12 +299,12 @@ def t(key):
     lang = "en"
     if _radio_ref:
         lang = getattr(_radio_ref, "language", "en")
-    
+
 
     current_locales = LOCALES.get(lang, LOCALES["en"])
     result = current_locales.get(key)
-    
+
     if result is None:
         result = LOCALES["en"].get(key, key)
-        
+
     return result

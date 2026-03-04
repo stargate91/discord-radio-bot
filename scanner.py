@@ -11,17 +11,17 @@ def get_cover_art(file_path: Path) -> bytes | None:
         return None
     folder = file_path.parent
     cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
-    
+
     for name in cover_names:
         cover_path = folder / name
         if cover_path.exists():
             return cover_path.read_bytes()
-            
+
     try:
         audio = MutagenFile(file_path)
         if audio is None:
             return None
-            
+
         if isinstance(audio, FLAC):
             if audio.pictures:
                 return audio.pictures[0].data
@@ -35,34 +35,34 @@ def get_cover_art(file_path: Path) -> bytes | None:
                     return tag.data
     except Exception as e:
         print(f"Error extracting cover art: {e}")
-        
+
     return None
 
 def find_and_save_cover(file_path: Path, db) -> str | None:
     folder = file_path.parent
     cover_names = ["cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"]
-    
+
     for name in cover_names:
         cover_path = folder / name
         if cover_path.exists():
             return str(cover_path)
-            
+
     art_bytes = get_cover_art(file_path)
     if not art_bytes:
         return None
-        
+
     cache_dir = Path("data/covers")
     cache_dir.mkdir(parents=True, exist_ok=True)
-    
+
     file_hash = hashlib.md5(str(file_path).encode()).hexdigest()
     ext = "png"
     if art_bytes.startswith(b'\xff\xd8'): ext = "jpg"
     elif art_bytes.startswith(b'\x89PNG'): ext = "png"
-    
+
     cache_path = cache_dir / f"{file_hash}.{ext}"
     if not cache_path.exists():
         cache_path.write_bytes(art_bytes)
-        
+
     return str(cache_path)
 
 def safe_int(value):
@@ -95,7 +95,7 @@ def extract_tags(file_path: Path):
         audio = MutagenFile(file_path)
     except Exception as e:
         print(f"Tag read error: {file_path} -> {e}")
-        return None     
+        return None
     if audio is None:
         return None
 
@@ -144,11 +144,11 @@ def extract_tags(file_path: Path):
         "rating": safe_int(rating)
     }
 
-def scan_music_library(config, db):
+def scan_music_library(config, db, force=False):
     inserted = 0
     skipped = 0
 
-    if not db.is_empty():
+    if not force and not db.is_empty():
         return 0, 0
 
     with db._connect() as conn:

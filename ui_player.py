@@ -134,7 +134,7 @@ class PlayPauseButton(discord.ui.Button):
         is_paused = radio.status == RadioStatusEnum.PAUSED or radio.status == RadioStatusEnum.IDLE
         label = None if radio.is_compact else (t('play_label') if is_paused else t('pause_label'))
         emoji = Icons.PLAY if is_paused else Icons.PAUSE
-        
+
         super().__init__(
             label=label,
             emoji=emoji,
@@ -238,7 +238,7 @@ class BackButton(discord.ui.Button):
         prev_song = self.db.get_previous_song(self.radio.last_history_paths)
         if prev_song:
             self.radio.dispatch(RadioAction.BACK, prev_song, user=interaction.user)
-            await interaction.response.send_message(f"{Icons.BACK_STEP} {t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
+            await interaction.response.send_message(f"{t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
         else:
             await interaction.response.send_message(t("back_error"), ephemeral=True)
 
@@ -411,7 +411,7 @@ class DetailsButton(discord.ui.Button):
         self.radio.show_details = not self.radio.show_details
         if _update_callback: await _update_callback(self.radio.current_song)
         await interaction.followup.send(
-            f"{Icons.INFO} {t('info_visibility')}: **{t('shown') if self.radio.show_details else t('hidden')}**",
+            f"{t('info_visibility')}: **{t('shown')}**" if self.radio.show_details else f"{t('info_visibility')}: **{t('hidden')}**",
             ephemeral=True
         )
 
@@ -430,7 +430,7 @@ class QueueToggleButton(discord.ui.Button):
         self.radio.show_queue = not self.radio.show_queue
         if _update_callback: await _update_callback(self.radio.current_song)
         await interaction.followup.send(
-            f"{Icons.QUEUE} {t('queue_visibility')}: **{t('shown') if self.radio.show_queue else t('hidden')}**",
+            f"{t('queue_visibility')}: **{t('shown')}**" if self.radio.show_queue else f"{t('queue_visibility')}: **{t('hidden')}**",
             ephemeral=True
         )
 
@@ -441,7 +441,7 @@ class UnifiedStandbyView(LayoutView):
 
         station_container = Container(accent_color=Theme.BACKGROUND)
         station_container.add_item(TextDisplay(f"**{t('system_sync')}**\n{t('synchro_subtitle')}"))
-        
+
         guild = _bot_ref.get_guild(_config_ref.guild_id)
         if guild:
             afk_id = _config_ref.afk_channel_id
@@ -449,20 +449,21 @@ class UnifiedStandbyView(LayoutView):
             row = ActionRow()
             row.add_item(StationSelect(radio, v_channels))
             station_container.add_item(row)
-            
+
             row_lang = ActionRow()
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
-            
+
             row_ui = ActionRow()
             row_ui.add_item(UIModeSelect(radio))
             station_container.add_item(row_ui)
-            
+
             station_container.add_item(Separator())
-            
+
             row_studio = ActionRow()
-            from ui_studio import PlaylistStudioButton
+            from ui_studio import PlaylistStudioButton, RescanLibraryButton
             row_studio.add_item(PlaylistStudioButton(radio))
+            row_studio.add_item(RescanLibraryButton(radio))
             station_container.add_item(row_studio)
         self.add_item(station_container)
 
@@ -477,7 +478,7 @@ class FrequencyStationView(LayoutView):
 
         station_container = Container(accent_color=Theme.BACKGROUND)
         station_container.add_item(TextDisplay(f"**{t('system_sync')}**\n{t('synchro_subtitle')}"))
-        
+
         guild = _bot_ref.get_guild(_config_ref.guild_id)
         if guild:
             afk_id = _config_ref.afk_channel_id
@@ -485,20 +486,20 @@ class FrequencyStationView(LayoutView):
             row = ActionRow()
             row.add_item(StationSelect(radio, v_channels))
             station_container.add_item(row)
-            
+
             row_lang = ActionRow()
             row_lang.add_item(LanguageSelect(radio))
             station_container.add_item(row_lang)
-            
+
             row_ui = ActionRow()
             row_ui.add_item(UIModeSelect(radio))
             station_container.add_item(row_ui)
-            
+
             station_container.add_item(Separator())
             row_meta = ActionRow()
             row_meta.add_item(DisconnectButton(radio))
             station_container.add_item(row_meta)
-        
+
         self.add_item(station_container)
 
 class NowPlayingView(LayoutView):
@@ -520,8 +521,8 @@ class NowPlayingView(LayoutView):
         status_title = f"{status_emoji} {t(status_key)}"
 
         master_container = Container(accent_color=accent_color)
-        
-        # Use the provided cover_path; do not perform redundant DB lookups here
+
+
         thumb = None
         if cover_path and Path(cover_path).exists():
             thumb = Thumbnail(f"attachment://cover.png")
@@ -548,7 +549,7 @@ class NowPlayingView(LayoutView):
             info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown') or 'Unknown'}")
             info_lines.append(f"**{t('source')}:** {song.get('mediatype_flac') or song.get('mediatype_mp3') or 'Unknown'}")
             info_lines.append(f"**{t('play_count_label')}:** {song.get('play_count', 0)}")
-            
+
             last_played = song.get('last_played')
             if last_played:
                 info_lines.append(f"**{t('last_played_label')}:** {str(last_played)[:16].replace('-', '.')}")
@@ -564,7 +565,7 @@ class NowPlayingView(LayoutView):
                 q_title = fixed(q_song.get('title', 'Unknown'), 22).strip()
                 q_list.append(f"{i}. {q_artist} - {q_title}")
             info_lines.append("\n".join(q_list) if q_list else f"*{t('empty')}*")
-        
+
         if radio.last_user:
             info_lines.append(f"\n{t('tuned_by')}: {radio.last_user.mention} @ {channel_mention}")
         else:
