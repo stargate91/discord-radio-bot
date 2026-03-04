@@ -376,6 +376,136 @@ class DeleteHistoryButton(discord.ui.Button):
         await interaction.followup.send(t("history_cleared"), ephemeral=True)
 
 
+class StatsButton(discord.ui.Button):
+    def __init__(self, radio, db):
+        super().__init__(label=None if radio.is_compact else t('stats_label'), emoji=Icons.STATS, style=discord.ButtonStyle.secondary, custom_id="stats_button")
+        self.radio = radio
+        self.db = db
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        from ui import embed_state
+        self.radio.active_view_type = "stats"
+        view = StatsView(self.radio, self.db, interaction.user, period="weekly", guild=interaction.guild)
+        search_id = embed_state.load_message_id("search")
+        if search_id:
+            try:
+                msg = await interaction.channel.fetch_message(search_id)
+                await msg.delete()
+            except: pass
+        msg = await interaction.followup.send(view=view, wait=True)
+        embed_state.save_message_id("search", msg.id)
+
+class StatsTabButton(discord.ui.Button):
+    def __init__(self, radio, db, label, period, user, active=False):
+        style = discord.ButtonStyle.primary if active else discord.ButtonStyle.secondary
+        super().__init__(label=label, style=style, disabled=active)
+        self.radio = radio
+        self.db = db
+        self.period = period
+        self.user = user
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        view = StatsView(self.radio, self.db, self.user, period=self.period, guild=interaction.guild)
+        await interaction.edit_original_response(view=view)
+
+class StatsView(LayoutView):
+    def __init__(self, radio, db, user=None, period="weekly", guild=None):
+        super().__init__(timeout=None)
+        self.radio = radio
+        self.db = db
+        self.user = user or radio.last_user
+        self.period = period
+        self.guild = guild
+
+        days = 7
+        period_key = "stats_weekly"
+        if period == "monthly":
+            days = 30
+            period_key = "stats_monthly"
+        elif period == "all_time":
+            days = None
+            period_key = "stats_all_time"
+
+        container = Container(accent_color=Theme.PRIMARY)
+
+        tab_row = ActionRow()
+        tab_row.add_item(StatsTabButton(radio, db, t("stats_weekly"), "weekly", self.user, active=(period == "weekly")))
+        tab_row.add_item(StatsTabButton(radio, db, t("stats_monthly"), "monthly", self.user, active=(period == "monthly")))
+        tab_row.add_item(StatsTabButton(radio, db, t("stats_all_time"), "all_time", self.user, active=(period == "all_time")))
+
+        close_btn = discord.ui.Button(emoji=Icons.CLOSE, style=discord.ButtonStyle.secondary)
+        async def close_callback(interaction):
+            await interaction.response.defer()
+            from ui import embed_state
+            embed_state.save_message_id("search", None)
+            self.radio.active_view_type = None
+            try: await interaction.message.delete()
+            except: pass
+        close_btn.callback = close_callback
+        tab_row.add_item(close_btn)
+        
+        container.add_item(tab_row)
+        container.add_item(Separator())
+
+        # Period info
+        container.add_item(TextDisplay(f"{Icons.STATUS} **{t(period_key)}**"))
+        container.add_item(Separator())
+
+        # Top Artists
+        top_artists = db.get_top_artists(days=days)
+        artist_text = f"**{t('top_artists')}**\n"
+        if top_artists:
+            artist_text += "\n".join([f"{i+1}. {a['artist']} ({a['count']})" for i, a in enumerate(top_artists)])
+        else:
+            artist_text += f"*{t('empty')}*"
+        container.add_item(TextDisplay(artist_text))
+        container.add_item(Separator())
+
+        # Top Songs
+        top_songs = db.get_top_songs(days=days)
+        songs_text = f"**{t('top_songs')}**\n"
+        if top_songs:
+            songs_text += "\n".join([f"{i+1}. {s['artist']} - {s['title']} ({s['count']})" for i, s in enumerate(top_songs)])
+        else:
+            songs_text += f"*{t('empty')}*"
+        container.add_item(TextDisplay(songs_text))
+        container.add_item(Separator())
+
+        # Top Listeners
+        top_users = db.get_top_users(days=days)
+        users_text = f"**{t('top_listeners')}**\n"
+        if top_users:
+            from ui import bot
+            user_list = []
+            for i, u in enumerate(top_users):
+                user_id = int(u['user_id'])
+                name = None
+                
+                # Try guild cache first for localized nickname
+                if self.guild:
+                    member = self.guild.get_member(user_id)
+                    if member: name = member.display_name
+                
+                # Try global cache
+                if not name:
+                    user_obj = bot.get_user(user_id)
+                    if user_obj: name = user_obj.display_name
+                
+                # Fallback to ID
+                if not name:
+                    name = f"User {user_id}"
+                    
+                user_list.append(f"{i+1}. {name} ({u['count']})")
+            users_text += "\n".join(user_list)
+        else:
+            users_text += f"*{t('empty')}*"
+        container.add_item(TextDisplay(users_text))
+
+        self.add_item(container)
+
+
 class PlaylistStudioView(LayoutView):
     def __init__(self, radio, db):
         super().__init__(timeout=None)

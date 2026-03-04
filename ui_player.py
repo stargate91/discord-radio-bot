@@ -612,7 +612,9 @@ class NowPlayingView(LayoutView):
 
         tools_row = ActionRow()
         from ui_search import QueueViewButton
+        from ui_studio import StatsButton
         tools_row.add_item(QueueViewButton(radio))
+        tools_row.add_item(StatsButton(radio, db))
         master_container.add_item(tools_row)
 
         self.add_item(master_container)

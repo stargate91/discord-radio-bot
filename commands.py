@@ -32,6 +32,25 @@ def setup_commands(tree, radio, db):
 
         await interaction.followup.send(f"Broadcasting: **{song['artist']} - {song['title']}**", ephemeral=True)
 
+
+    @tree.command(name="stats", description="Show playback statistics")
+    async def stats(interaction: discord.Interaction):
+        from ui_studio import StatsView
+        from ui import embed_state
+        await interaction.response.defer()
+        
+        view = StatsView(radio, db, interaction.user, guild=interaction.guild)
+        
+        old_id = embed_state.load_message_id("search")
+        if old_id:
+            try:
+                msg = await interaction.channel.fetch_message(old_id)
+                await msg.delete()
+            except: pass
+            
+        msg = await interaction.followup.send(view=view, wait=True)
+        embed_state.save_message_id("search", msg.id)
+
     @play.autocomplete('query')
     async def play_autocomplete(interaction: discord.Interaction, current: str):
         if not current or len(current) < 2:

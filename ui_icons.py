@@ -42,6 +42,7 @@ class Icons:
     STATUS = discord.PartialEmoji.from_str("<:folderopen:1478347534312276041>")
     WARNING = discord.PartialEmoji.from_str("<:trianglealert:1478266385212641421>")
     RESCAN = discord.PartialEmoji.from_str("<:filescan:1478567252457685062>")
+    STATS = discord.PartialEmoji.from_str("<:chartnoaxescombined:1478590600201896068>")
 
 
 

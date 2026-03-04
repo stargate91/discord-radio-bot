@@ -581,3 +581,83 @@ class DatabaseManager:
 
             cursor.execute("UPDATE playlist_songs SET position = ? WHERE playlist_id = ? AND song_path = ?", (new_pos, playlist_id, song_path))
             conn.commit()
+
+    def get_top_artists(self, days=7, limit=5):
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            where_clause = ""
+            params = []
+            
+            if days is not None:
+                since = int(time.time()) - (days * 24 * 3600)
+                where_clause = "WHERE h.timestamp > ?"
+                params.append(since)
+            
+            params.append(limit)
+            
+            query = f"""
+                SELECT s.artist, COUNT(*) as count
+                FROM playback_history h
+                JOIN songs s ON h.song_path = s.path
+                {where_clause}
+                GROUP BY s.artist
+                ORDER BY count DESC
+                LIMIT ?
+            """
+            cursor.execute(query, tuple(params))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_top_songs(self, days=7, limit=5):
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            where_clause = ""
+            params = []
+            
+            if days is not None:
+                since = int(time.time()) - (days * 24 * 3600)
+                where_clause = "WHERE h.timestamp > ?"
+                params.append(since)
+                
+            params.append(limit)
+            
+            query = f"""
+                SELECT s.artist, s.title, COUNT(*) as count
+                FROM playback_history h
+                JOIN songs s ON h.song_path = s.path
+                {where_clause}
+                GROUP BY s.path
+                ORDER BY count DESC
+                LIMIT ?
+            """
+            cursor.execute(query, tuple(params))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_top_users(self, days=7, limit=5):
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            where_clause = "WHERE user_id IS NOT NULL"
+            params = []
+            
+            if days is not None:
+                since = int(time.time()) - (days * 24 * 3600)
+                where_clause += " AND timestamp > ?"
+                params.append(since)
+                
+            params.append(limit)
+            
+            query = f"""
+                SELECT user_id, COUNT(*) as count
+                FROM playback_history
+                {where_clause}
+                GROUP BY user_id
+                ORDER BY count DESC
+                LIMIT ?
+            """
+            cursor.execute(query, tuple(params))
+            return [dict(row) for row in cursor.fetchall()]
