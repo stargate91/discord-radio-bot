@@ -1,11 +1,14 @@
 from ui_icons import Icons
 
+
+
 LOCALES = {
+
     "en": {
         "system_sync": f"{Icons.SYNC} CONNECTION",
-        "synchro_subtitle": "Select a channel to begin transmission.\n\"I'm everything you want to hear.\"",
+        "synchro_subtitle": "Pick a channel to start the transmission.\n\"I'm everything you want to hear.\"",
         "standby_mode": f"{Icons.STANDBY} STANDBY",
-        "standby_subtitle": "\"Everything you want to see. Everything you want to hear.\"\nPlease select a frequency to start the broadcast.",
+        "standby_subtitle": "\"Everything you want to see. Everything you want to hear.\"\nPick a channel to start the broadcast.",
         "now_playing": "NOW PLAYING",
         "paused": "PAUSED",
         "idle": "IDLE",
@@ -38,56 +41,55 @@ LOCALES = {
         "played_at": "Played at",
         "date_format": "%Y-%m-%d %H:%M",
         "filter_label": "Filter",
-        "import_genre_modal_title": "Import Songs from Genre",
-        "studio_locked_message": "The Playlist Studio is currently being used by {user}. Please wait until they finish.",
+        "studio_locked_message": "{user} is using the Playlist Studio right now. Hold on until they're done.",
         "filter_modal_title": "Filter by date",
         "filter_from_label": "From (YYYY.MM.DD)",
         "filter_to_label": "To (YYYY.MM.DD)",
-        "date_invalid_error": "Invalid date format! Please use YYYY.MM.DD",
+        "date_invalid_error": "Wrong date format! Use YYYY.MM.DD",
         "clear_filter_label": "Clear Filter",
         "delete_history_label": "Delete History",
-        "delete_history_confirm": "Are you sure you want to clear all history? This cannot be undone.",
+        "delete_history_confirm": "Sure you want to clear all history? You can't undo this.",
         "history_cleared": "Playback history cleared.",
         "shuffle_label": "Shuffle",
         "edit_queue_label": "Edit Queue",
         "clear_queue_label": "Clear Queue",
-        "clear_queue_confirm": "Are you sure you want to clear the entire queue?",
+        "clear_queue_confirm": "Sure you want to clear the whole queue?",
         "remove_song_label": "Remove",
         "shuffle_feedback": "Queue shuffled!",
         "up_next": "Up Next",
         "empty": "Empty",
         "tuned_by": "User",
         "location": "Channel",
-        "placeholder_freq": "Select Channel",
-        "placeholder_genre": "Select Genre",
+        "placeholder_freq": "Pick a Channel",
+        "placeholder_genre": "Pick a Genre",
         "placeholder_lang": "Language",
-        "placeholder_ui": "Select UI Style",
+        "placeholder_ui": "Pick a UI Style",
         "syncing": "Syncing with channel frequency...",
         "severing": "Severing synthetic connection. \"Part of me stay with you?\"",
-        "switching_genre": "Genre switching to:",
-        "resuming": "Resuming/Replaying playback...",
-        "cannot_pause_stopped": "Stopped music cannot be paused",
-        "resuming_feedback": "Resuming playback...",
+        "switching_genre": "Switching genre to:",
+        "resuming": "Resuming playback...",
+        "cannot_pause_stopped": "Can't pause music while it's stopped",
+        "resuming_feedback": "Getting back to the music...",
         "pausing": "Pausing playback...",
         "stopping": "Stopping playback...",
         "forwarding": "Moving to next track...",
         "randomizing": "Generating new signal...",
-        "nothing_playing": "Nothing is playing right now.",
-        "cannot_seek_stopped": "Cannot seek while the radio is stopped",
-        "back_error": "No more history to go back to!",
-        "cooldown_error": "System stable, please wait a moment...",
+        "nothing_playing": "Nothing's playing right now.",
+        "cannot_seek_stopped": "Can't seek while the radio is stopped",
+        "back_error": "Nothing left in history to go back to!",
+        "cooldown_error": "System's stabilizing, hold on a sec...",
         "jump_modal_title": "Jump to timestamp",
         "timestamp_input_label": "Enter timestamp (mm:ss)",
-        "format_error": "Format must be mm:ss",
-        "no_current_track": "There is no current track",
-        "too_long": "Timestamp too long",
+        "format_error": "Format's gotta be mm:ss",
+        "no_current_track": "There's no current track",
+        "too_long": "Timestamp's too long",
         "jumping": "Jumping to",
         "vol_modal_title": "Set Volume (0-100%)",
         "vol_input_label": "Volume (%)",
-        "invalid_number": "Invalid number!",
-        "vol_range_error": "Volume must be between 0 and 100",
+        "invalid_number": "That's not a number!",
+        "vol_range_error": "Volume's gotta be between 0 and 100",
         "vol_set": "Volume set to:",
-        "no_playing_error": "No song is currently playing",
+        "no_playing_error": "Nothing's playing right now",
         "liked": "Liked:",
         "like_withdrawn": "Like withdrawn:",
         "liked_replaced": "Liked (replaced dislike):",
@@ -131,15 +133,15 @@ LOCALES = {
         "bulk_added_to_queue": "Added {count} songs to queue.",
         "last_label": "Last",
         "reset_radio_label": "Reset Radio",
-        "radio_reset_feedback": "Radio reset to random mode.",
-        "no_permission": "You do not have the required role to access this channel.",
-        "no_permission_general": "You do not have the required permissions for this action.",
+        "radio_reset_feedback": "Radio's back to random mode.",
+        "no_permission": "You don't have the right role for this channel.",
+        "no_permission_general": "You don't have permission for that.",
         "playlist_studio_label": "Playlist Studio",
         "playlist_studio_title": f"{Icons.STUDIO} PLAYLIST STUDIO",
-        "playlist_studio_subtitle": "Manage and edit your own personal playlists.",
+        "playlist_studio_subtitle": "Manage and edit your playlists here.",
         "new_playlist_label": "New Playlist",
         "delete_playlist_label": "Delete Playlist",
-        "select_playlist_placeholder": "Select Playlist to Edit",
+        "select_playlist_placeholder": "Pick a playlist to edit",
         "playlist_editor_title": f"{Icons.PLAYLIST} EDITING PLAYLIST",
         "save_exit_label": "Save & Exit",
         "create_playlist_modal_title": "Create New Playlist",
@@ -153,14 +155,15 @@ LOCALES = {
         "ui_mode_full": "Full Interface (Icons + Labels)",
         "ui_mode_compact": "Compact Interface (Icons only)",
         "rescan_label": "Rescan Library",
-        "rescanning": "Scanning music library... Please wait.",
-        "rescan_complete": "Scan complete! Found {inserted} new tracks, skipped {skipped}."
+        "rescanning": "Scanning the library... Hold on.",
+        "rescan_complete": "Scan's done! Found {inserted} new tracks, skipped {skipped}."
     },
+
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
-        "synchro_subtitle": "Válasszon csatornát az adás megkezdéséhez.\n\"Én vagyok minden, amit hallani akarsz.\"",
+        "synchro_subtitle": "Válassz csatornát az adás megkezdéséhez.\n\"Én vagyok minden, amit hallani akarsz.\"",
         "standby_mode": f"{Icons.STANDBY} KÉSZENLÉT",
-        "standby_subtitle": "\"Minden, amit látni akarsz. Minden, amit hallani akarsz.\"\nVálasszon csatornát a sugárzás indításához.",
+        "standby_subtitle": "\"Minden, amit látni akarsz. Minden, amit hallani akarsz.\"\nVálassz csatornát a sugárzás indításához.",
         "now_playing": "MOST SZÓL",
         "paused": "SZÜNETELTETVE",
         "idle": "ÜRESJÁRAT",
@@ -196,7 +199,7 @@ LOCALES = {
         "filter_modal_title": "Szűrés dátum alapján",
         "filter_from_label": "Ettől (ÉÉÉÉ.HH.NN)",
         "filter_to_label": "Eddig (ÉÉÉÉ.HH.NN)",
-        "date_invalid_error": "Hibás dátum formátum! Használja: ÉÉÉÉ.HH.NN",
+        "date_invalid_error": "Hibás dátum formátum! Használd: ÉÉÉÉ.HH.NN",
         "clear_filter_label": "Szűrő törlése",
         "delete_history_label": "Előzmények törlése",
         "delete_history_confirm": "Biztosan törölni szeretnél minden előzményt? Ez nem vonható vissza.",
@@ -211,42 +214,42 @@ LOCALES = {
         "empty": "Üres",
         "tuned_by": "Felhasználó",
         "location": "Csatorna",
-        "placeholder_freq": "Csatorna kiválasztása",
-        "placeholder_genre": "Stílus kiválasztása",
+        "placeholder_freq": "Válassz csatornát",
+        "placeholder_genre": "Válassz stílust",
         "placeholder_lang": "Nyelvválasztás",
         "placeholder_ui": "Kezelőfelület stílusa",
         "syncing": "Csatlakozás a csatorna frekvenciájához...",
         "severing": "A szintetikus kapcsolat megszakítva. \"Veled maradhat egy részem?\"",
         "switching_genre": "Stílusváltás folyamatban:",
         "resuming": "Lejátszás folytatása...",
-        "cannot_pause_stopped": "Megállított zene nem szüneteltethető",
+        "cannot_pause_stopped": "A megállított zenét nem tudod szüneteltetni",
         "resuming_feedback": "Lejátszás folytatása...",
         "pausing": "Lejátszás szüneteltetése...",
         "stopping": "Lejátszás leállítása...",
         "forwarding": "Ugrás a következő számra...",
         "randomizing": "Új jel generálása...",
         "nothing_playing": "Jelenleg semmi sem szól.",
-        "cannot_seek_stopped": "Megállított rádiónál nem lehet tekerni",
-        "back_error": "Nincs több előzmény a visszafelé léptetéshez!",
-        "cooldown_error": "Rendszer stabilizálása folyamatban, várjon egy pillanatot...",
+        "cannot_seek_stopped": "Megállított rádiónál nem tudsz tekerni",
+        "back_error": "Nincs több előzmény, amin visszaléphetnél!",
+        "cooldown_error": "Rendszer stabilizálása folyamatban, várj egy pillanatot...",
         "jump_modal_title": "Ugrás időpontra",
-        "timestamp_input_label": "Írja be az időpontot (pp:mp)",
-        "format_error": "A formátum pp:mp kell legyen",
+        "timestamp_input_label": "Add meg az időpontot (pp:mp)",
+        "format_error": "A formátum pp:mp kell, hogy legyen",
         "no_current_track": "Nincs aktuális szám az adatbázisban",
         "too_long": "Az időpont hosszabb, mint a szám",
         "jumping": "Ugrás ide",
         "vol_modal_title": "Hangerő beállítása (0-100%)",
         "vol_input_label": "Hangerő (%)",
         "invalid_number": "Érvénytelen szám!",
-        "vol_range_error": "A hangerő 0 és 100 között kell legyen",
+        "vol_range_error": "A hangerőnek 0 és 100 között kell lennie",
         "vol_set": "Hangerő beállítva:",
         "no_playing_error": "Jelenleg nem szól semmi",
         "liked": "Kedvelem:",
         "like_withdrawn": "Kedvelés visszavonva:",
-        "liked_replaced": "Kedvelve (Nem tetszik cserélve):",
+        "liked_replaced": "Kedvelve (Nem tetszik lecserélve):",
         "disliked": "Nem tetszik:",
         "dislike_withdrawn": "Nem tetszik visszavonva:",
-        "disliked_replaced": "Nem tetszik (Kedvelve cserélve):",
+        "disliked_replaced": "Nem tetszik (Kedvelés lecserélve):",
         "record_error": "Sikertelen rögzítés",
         "play_label": "Lejátszás",
         "pause_label": "Szünet",
@@ -285,14 +288,14 @@ LOCALES = {
         "last_label": "Utolsó",
         "reset_radio_label": "Rádió alaphelyzet",
         "radio_reset_feedback": "Rádió visszaállítva véletlenszerű módba.",
-        "no_permission": "Nincs jogosultsága ehhez a csatornához a szükséges rang hiánya miatt.",
-        "no_permission_general": "Nincs jogosultsága ehhez a művelethez.",
+        "no_permission": "Nincs jogosultságod ehhez a csatornához a szükséges rang hiánya miatt.",
+        "no_permission_general": "Nincs jogosultságod ehhez a művelethez.",
         "playlist_studio_label": "Playlist Stúdió",
         "playlist_studio_title": f"{Icons.STUDIO} PLAYLIST STÚDIÓ",
         "playlist_studio_subtitle": "Saját létrehozott listáid kezelése és szerkesztése.",
         "new_playlist_label": "Új lista",
         "delete_playlist_label": "Lista törlése",
-        "select_playlist_placeholder": "Lista kiválasztása szerkesztésre",
+        "select_playlist_placeholder": "Válassz listát a szerkesztéshez",
         "playlist_editor_title": f"{Icons.PLAYLIST} LISTA SZERKESZTÉSE",
         "save_exit_label": "Mentés és kilépés",
         "create_playlist_modal_title": "Új lejátszási lista létrehozása",
@@ -301,34 +304,55 @@ LOCALES = {
         "song_removed_from_playlist": "Eltávolítva a listáról:",
         "playlist_deleted": "Lejátszási lista törölve.",
         "rename_playlist_label": "Átnevezés",
-        "import_genre_modal_title": "Dalok importálása műfajból",
         "studio_locked_message": "A Playlist Stúdiót jelenleg {user} használja. Kérlek várd meg, amíg befejezi.",
         "ui_mode_label": "Kezelőfelület stílusa",
         "ui_mode_full": "Teljes felület (Ikonok + Szöveg)",
         "ui_mode_compact": "Kompakt felület (Csak ikonok)",
-        "rescan_label": "Könyvtár Újraszkennelés",
+        "rescan_label": "Zenetár Újraszkennelése",
         "rescanning": "Zenetár szkennelése... Kérlek várj.",
         "rescan_complete": "Szkennelés kész! {inserted} új dal hozzáadva, {skipped} kihagyva."
     }
+
 }
+
+
 
 _radio_ref = None
 
+
+
 def init_translate(radio_instance):
+
     global _radio_ref
+
     _radio_ref = radio_instance
 
 
+
+
+
 def t(key):
+
     lang = "en"
+
     if _radio_ref:
+
         lang = getattr(_radio_ref, "language", "en")
 
 
+
+
+
     current_locales = LOCALES.get(lang, LOCALES["en"])
+
     result = current_locales.get(key)
 
+
+
     if result is None:
+
         result = LOCALES["en"].get(key, key)
+
+
 
     return result
