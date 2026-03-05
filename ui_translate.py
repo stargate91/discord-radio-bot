@@ -152,7 +152,20 @@ LOCALES = {
         "ui_mode_compact": "Compact Interface (Icons only)",
         "rescan_label": "Rescan Library",
         "rescanning": "Scanning the library... Hold on.",
-        "rescan_complete": "Scan's done! Found {inserted} new tracks, skipped {skipped}."
+        "rescan_complete": "Scan's done! Found {inserted} new tracks, skipped {skipped}.",
+        "feedback_label": "Feedback",
+        "feedback_modal_title": "Send Feedback",
+        "feedback_type_label": "Type",
+        "feedback_type_bug": "Bug Report",
+        "feedback_type_feature": "Feature Request",
+        "feedback_type_music": "Music Request",
+        "feedback_content_label": "Tell us more...",
+        "feedback_music_content_label": "Artist - Title (and link if possible)",
+        "feedback_sent": "Feedback received. Transmission complete.",
+        "added_to_favs": "Added to favourites:",
+        "removed_from_favs": "Removed from favourites:",
+        "fav_add_label": "Favorite",
+        "fav_rem_label": "Unfavorite"
     },
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
@@ -305,7 +318,20 @@ LOCALES = {
         "ui_mode_compact": "Kompakt felület (Csak ikonok)",
         "rescan_label": "Zenetár Újraszkennelése",
         "rescanning": "Zenetár szkennelése... Kérlek várj.",
-        "rescan_complete": "Szkennelés kész! {inserted} új dal hozzáadva, {skipped} kihagyva."
+        "rescan_complete": "Szkennelés kész! {inserted} új dal hozzáadva, {skipped} kihagyva.",
+        "feedback_label": "Visszajelzés",
+        "feedback_modal_title": "Visszajelzés küldése",
+        "feedback_type_label": "Típus",
+        "feedback_type_bug": "Hiba jelentése",
+        "feedback_type_feature": "Ötlet beküldése",
+        "feedback_type_music": "Zene kérése",
+        "feedback_content_label": "Részletek...",
+        "feedback_music_content_label": "Előadó - Cím (és link ha van)",
+        "feedback_sent": "Visszajelzés fogadva. Adatátvitel kész.",
+        "added_to_favs": "Hozzáadva a kedvencekhez:",
+        "removed_from_favs": "Eltávolítva a kedvencekből:",
+        "fav_add_label": "Kedvenc",
+        "fav_rem_label": "Mégsem"
     }
 }
 _radio_ref = None

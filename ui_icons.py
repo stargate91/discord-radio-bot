@@ -46,3 +46,12 @@ class Icons:
     LOCATION = discord.PartialEmoji.from_str("<:mappin:1478347647579324487>")
     LANG_EN = "🇬🇧"
     LANG_HU = "🇭🇺"
+    
+    FEEDBACK_BUG = discord.PartialEmoji.from_str("<:bug:1478956099406270534>")
+    FEEDBACK_FEATURE = discord.PartialEmoji.from_str("<:lightbulb:1478956100677275648>")
+    FEEDBACK_MUSIC = discord.PartialEmoji.from_str("<:music:1478956102812176527>")
+    FEEDBACK = discord.PartialEmoji.from_str("<:mail:1478956101750882386>")
+    
+    HEART_PLUS = discord.PartialEmoji.from_str("<:heartplus:1478958134981820496>")
+    HEART_MINUS = discord.PartialEmoji.from_str("<:heartminus:1478958133526270143>")
+    FOLDER_HEART = discord.PartialEmoji.from_str("<:folderheart:1478959293867757618>")

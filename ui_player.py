@@ -418,7 +418,47 @@ class DislikeButton(discord.ui.Button):
         title = updated_song.get("title") or "Unknown Title"
         if status == "added": msg = f"{t('disliked')} **{artist} - {title}**"
         elif status == "removed": msg = f"{t('dislike_withdrawn')} **{artist} - {title}**"
-        else: msg = f"{t('disliked_replaced')} **{artist} - {title}**"
+        msg = f"{t('disliked_replaced')} **{artist} - {title}**"
+        await interaction.followup.send(msg, ephemeral=True)
+
+class FavoriteButton(discord.ui.Button):
+    def __init__(self, radio, is_favorited=False):
+        emoji = Icons.HEART_MINUS if is_favorited else Icons.HEART_PLUS
+        label = None
+        if not radio.is_compact:
+            label = t("fav_rem_label") if is_favorited else t("fav_add_label")
+            
+        super().__init__(
+            label=label,
+            emoji=emoji,
+            style=discord.ButtonStyle.secondary,
+            custom_id="favorite_toggle"
+        )
+        self.radio = radio
+        self.is_favorited = is_favorited
+
+    @handle_ui_error
+    async def callback(self, interaction: discord.Interaction):
+        if not self.radio.current_song:
+            await interaction.response.send_message(t("no_playing_error"), ephemeral=True)
+            return
+        
+        await interaction.response.defer(ephemeral=True)
+        song_path = self.radio.current_song.get("path")
+        status = await self.radio.db.toggle_favorite(interaction.user.id, interaction.user.display_name, song_path)
+        
+        song = self.radio.current_song
+        artist = song.get("artist") or "Unknown Artist"
+        title = song.get("title") or "Unknown Title"
+        
+        if status == "added":
+            msg = f"{t('added_to_favs')} **{artist} - {title}**"
+        else:
+            msg = f"{t('removed_from_favs')} **{artist} - {title}**"
+            
+        if _update_callback:
+            await _update_callback(self.radio.current_song)
+            
         await interaction.followup.send(msg, ephemeral=True)
 
 class DetailsButton(discord.ui.Button):
@@ -485,8 +525,10 @@ class UnifiedStandbyView(BaseView):
             station_container.add_item(Separator())
             row_studio = ActionRow()
             from ui_studio import PlaylistStudioButton, RescanLibraryButton
+            from ui_feedback import FeedbackButton
             row_studio.add_item(PlaylistStudioButton(radio))
             row_studio.add_item(RescanLibraryButton(radio))
+            row_studio.add_item(FeedbackButton(radio))
             station_container.add_item(row_studio)
         self.add_item(station_container)
         standby_container = Container(accent_color=Theme.BACKGROUND)
@@ -514,17 +556,20 @@ class FrequencyStationView(BaseView):
             station_container.add_item(row_ui)
             station_container.add_item(Separator())
             row_meta = ActionRow()
+            from ui_feedback import FeedbackButton
             row_meta.add_item(DisconnectButton(radio))
+            row_meta.add_item(FeedbackButton(radio))
             station_container.add_item(row_meta)
         self.add_item(station_container)
 
 class NowPlayingView(BaseView):
 
-    def __init__(self, radio, genres=None, song=None, cover_path=None):
+    def __init__(self, radio, genres=None, song=None, cover_path=None, is_favorited=False):
         super().__init__(radio)
         db = radio.db
         genres = genres or []
         song = song or radio.current_song or {}
+        self.is_favorited = is_favorited
         accent_color = Theme.PLAYING
         status_key = "now_playing"
         status_emoji = Icons.HEADPHONES
@@ -606,16 +651,17 @@ class NowPlayingView(BaseView):
         library_row = ActionRow()
         library_row.add_item(LikeButton(radio))
         library_row.add_item(DislikeButton(radio))
+        library_row.add_item(FavoriteButton(radio, is_favorited=self.is_favorited))
         from ui_search import SearchButton
-        from ui_studio import PlaylistViewButton, HistoryButton
+        from ui_studio import PlaylistViewButton
         library_row.add_item(SearchButton(radio))
         library_row.add_item(PlaylistViewButton(radio))
-        library_row.add_item(HistoryButton(radio))
         master_container.add_item(library_row)
         tools_row = ActionRow()
         from ui_search import QueueViewButton
-        from ui_studio import StatsButton
+        from ui_studio import StatsButton, HistoryButton
         tools_row.add_item(QueueViewButton(radio))
         tools_row.add_item(StatsButton(radio))
+        tools_row.add_item(HistoryButton(radio))
         master_container.add_item(tools_row)
         self.add_item(master_container)

@@ -15,6 +15,7 @@ class Config:
         self.guild_id = int(data["guild_id"])
         self.voice_channel_id = int(data["voice_channel_id"])
         self.radio_text_channel_id = int(data["radio_text_channel_id"])
+        self.feedback_channel_id = int(data.get("feedback_channel_id", 0))
         self.afk_channel_id = int(data.get("afk_channel_id", 0))
         self.default_genre = data["default_genre"]
         self.default_language = data.get("default_language", "en")

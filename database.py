@@ -12,7 +12,6 @@ class DatabaseManager:
     def __init__(self):
         self.db_file = DB_FILE
     async def initialize(self):
-        """Async initialization of the database."""
         async with self.connect() as db:
             await db.execute("PRAGMA journal_mode=WAL;")
             await db.execute("""
@@ -68,9 +67,16 @@ class DatabaseManager:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 user_id INTEGER,
-                created_at INTEGER NOT NULL
+                created_at INTEGER NOT NULL,
+                is_favorite INTEGER DEFAULT 0
             )
             """)
+            cursor = await db.execute("PRAGMA table_info(playlists)")
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+            if "is_favorite" not in column_names:
+                await db.execute("ALTER TABLE playlists ADD COLUMN is_favorite INTEGER DEFAULT 0")
+                print("[DB] Added 'is_favorite' column to 'playlists' table.")
             await db.execute("""
             CREATE TABLE IF NOT EXISTS playlist_songs (
                 playlist_id INTEGER,
@@ -123,6 +129,15 @@ class DatabaseManager:
                     print("[DB] Initializing Search Index (FTS)...")
                     await db.execute("INSERT INTO songs_fts(rowid, artist, title, album) SELECT id, artist, title, album FROM songs")
             await db.execute("""
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )
+            """)
+            await db.execute("""
             CREATE TABLE IF NOT EXISTS metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT
@@ -135,9 +150,6 @@ class DatabaseManager:
                 row = await cursor.fetchone()
                 return row[0] == 0
     async def insert_song_batch(self, db, data: dict):
-        """Note: This takes an active connection for batch efficiency.
-        Uses UPSERT logic (INSERT ... ON CONFLICT DO UPDATE) if path exists.
-        """
         await db.execute("""
         INSERT INTO songs (
             path, artist, title, album, date, label, catnum, genre,
@@ -198,6 +210,13 @@ class DatabaseManager:
     async def set_metadata(self, key: str, value: str):
         async with self.connect() as db:
             await db.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", (key, str(value)))
+            await db.commit()
+    async def save_feedback(self, user_id: int, feedback_type: str, content: str):
+        async with self.connect() as db:
+            await db.execute("""
+                INSERT INTO feedback (user_id, type, content, timestamp)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, feedback_type, content, int(time.time())))
             await db.commit()
     async def get_random_song_by_rating(self, min_rating: int = 5):
         async with self.connect() as db:
@@ -512,7 +531,7 @@ class DatabaseManager:
             await db.commit()
     async def rename_playlist(self, playlist_id: int, new_name: str):
         async with self.connect() as db:
-            await db.execute("UPDATE playlists SET name = ? WHERE id = ?", (new_name, playlist_id))
+            await db.execute("UPDATE playlists SET name = ? WHERE id = ? AND is_favorite = 0", (new_name, playlist_id))
             await db.commit()
     async def move_song_in_playlist(self, playlist_id: int, song_path: str, direction: int):
         async with self.connect() as db:
@@ -581,3 +600,52 @@ class DatabaseManager:
             async with db.execute(query, tuple(params)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
+    async def get_or_create_favorites(self, user_id: int, username: str) -> int:
+        async with self.connect() as db:
+            async with db.execute(
+                "SELECT id FROM playlists WHERE user_id = ? AND is_favorite = 1 LIMIT 1",
+                (user_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row: return row[0]
+            name = f"{username}'s Favourites"
+            async with db.execute(
+                "INSERT INTO playlists (name, user_id, created_at, is_favorite) VALUES (?, ?, ?, ?)",
+                (name, user_id, int(time.time()), 1)
+            ) as cursor:
+                await db.commit()
+                return cursor.lastrowid
+    async def is_song_in_favorites(self, user_id: int, song_path: str) -> bool:
+        async with self.connect() as db:
+            async with db.execute("""
+                SELECT 1 FROM playlist_songs ps
+                JOIN playlists p ON ps.playlist_id = p.id
+                WHERE p.user_id = ? AND p.is_favorite = 1 AND ps.song_path = ?
+            """, (user_id, song_path)) as cursor:
+                row = await cursor.fetchone()
+                return row is not None
+    async def toggle_favorite(self, user_id: int, username: str, song_path: str) -> str:
+        playlist_id = await self.get_or_create_favorites(user_id, username)
+        async with self.connect() as db:
+            async with db.execute(
+                "SELECT 1 FROM playlist_songs WHERE playlist_id = ? AND song_path = ?",
+                (playlist_id, song_path)
+            ) as cursor:
+                exists = await cursor.fetchone()
+            if exists:
+                await db.execute(
+                    "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_path = ?",
+                    (playlist_id, song_path)
+                )
+                await db.commit()
+                return "removed"
+            else:
+                async with db.execute("SELECT MAX(position) FROM playlist_songs WHERE playlist_id = ?", (playlist_id,)) as cursor:
+                    res = await cursor.fetchone()
+                    max_pos = res[0] or 0
+                await db.execute(
+                    "INSERT INTO playlist_songs (playlist_id, song_path, position) VALUES (?, ?, ?)",
+                    (playlist_id, song_path, max_pos + 1)
+                )
+                await db.commit()
+                return "added"

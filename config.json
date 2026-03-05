@@ -2,6 +2,7 @@
     "guild_id": "YOUR_GUILD_ID",
     "voice_channel_id": "YOUR_VOICE_CHANNEL_ID",
     "radio_text_channel_id": "YOUR_RADIO_TEXT_CHANNEL_ID",
+    "feedback_channel_id": "1424674399205851250",
     "afk_channel_id": "YOUR_AFK_CHANNEL_ID",
     "default_genre": "Electronic",
     "cleanup_interval_days": 14,

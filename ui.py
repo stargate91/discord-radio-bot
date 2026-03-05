@@ -87,7 +87,12 @@ async def update_now_playing(song: dict):
         except:
             file = None
     genres = await radio.db.get_all_genres()
-    player_view = NowPlayingView(radio, genres=genres, song=song, cover_path=cover_path if valid_file else None)
+
+    is_fav = False
+    if song and radio.last_user:
+        is_fav = await radio.db.is_song_in_favorites(radio.last_user.id, song.get("path", ""))
+
+    player_view = NowPlayingView(radio, genres=genres, song=song, cover_path=cover_path if valid_file else None, is_favorited=is_fav)
     if not radio.now_playing_message:
         msg_id = radio.embed_manager.load_message_id("player")
         radio.now_playing_message = await safe_fetch_message(channel, msg_id)

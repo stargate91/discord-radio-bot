@@ -81,10 +81,11 @@ class PlaylistSelect(discord.ui.Select):
         self.db = radio.db
         options = []
         for p in playlists:
+            icon = Icons.FOLDER_HEART if p.get('is_favorite') == 1 else Icons.PLAYLIST
             options.append(discord.SelectOption(
                 label=p['name'],
                 value=str(p['id']),
-                emoji=Icons.PLAYLIST
+                emoji=icon
             ))
         super().__init__(placeholder=t("select_playlist_placeholder"), options=options, custom_id="playlist_select")
 
@@ -537,12 +538,18 @@ class PlaylistEditorView(PaginatedView):
         total_duration = sum(s.get('duration', 0) for s in self.data_list)
         duration_str = format_duration(total_duration)
         container = Container(accent_color=Theme.PRIMARY)
-        playlist_name = next((p['name'] for p in self.all_playlists if p['id'] == playlist_id), "Unknown")
+        current_pl = next((p for p in self.all_playlists if p['id'] == playlist_id), None)
+        is_fav = (current_pl.get('is_favorite') == 1) if current_pl else False
+        
+        playlist_name = current_pl['name'] if current_pl else "Unknown"
         container.add_item(TextDisplay(f"**{t('playlist_editor_title')}: {playlist_name}**"))
         ctrl_row = ActionRow()
         from ui_search import SearchButton
         ctrl_row.add_item(SearchButton(radio))
-        ctrl_row.add_item(RenamePlaylistButton(radio, playlist_id))
+        
+        if not is_fav:
+            ctrl_row.add_item(RenamePlaylistButton(radio, playlist_id))
+            
         ctrl_row.add_item(DeletePlaylistButton(radio, playlist_id))
         ctrl_row.add_item(ExitStudioButton(radio))
         container.add_item(ctrl_row)

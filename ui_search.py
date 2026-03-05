@@ -318,7 +318,8 @@ class SearchResultsView(PaginatedView):
                     container.add_item(Section(album_info, accessory=SearchBySelectionButton(radio, t("songs_tab"), "album_songs", (item['artist'], item['album']), user, original_query=self.original_query)))
                 elif self.search_type == "playlists":
                     is_owned = item.get('user_id') == self.user.id
-                    prefix = f"{Icons.USER} " if is_owned else ""
+                    is_fav = item.get('is_favorite') == 1
+                    prefix = f"{Icons.FOLDER_HEART} " if is_fav else (f"{Icons.USER} " if is_owned else "")
                     playlist_info = f"**{i}. {prefix}{item['name']}**"
                     container.add_item(Section(playlist_info, accessory=SearchBySelectionButton(radio, t("songs_tab"), "playlist_songs", item['id'], user, original_query=self.original_query)))
         footer_text = f"{self.pagination_info} • {t('initiated_by')} {self.user.mention}"
