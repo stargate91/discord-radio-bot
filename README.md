@@ -80,7 +80,3 @@ python main.py
 ## Commands
 
 - `/play <query>`: Instant search and play. Supports multi-word queries and autocomplete suggestions.
-
----
-**GitHub About Snippet:**
-> Premium 24/7 Discord Radio Bot with local library management, Metadata/Cover art extraction, Slash Commands, Playlist Studio, and a high-end persistent UI (EN/HU support).
