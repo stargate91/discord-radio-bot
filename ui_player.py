@@ -4,7 +4,7 @@ from pathlib import Path
 from ui_translate import t
 from ui_icons import Icons
 from ui_base import handle_ui_error, BaseView
-from ui_utils import fixed, format_duration
+from ui_utils import fixed, format_duration, get_dominant_color
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from ui_theme import Theme
 _update_callback = None
@@ -581,23 +581,61 @@ class NowPlayingView(BaseView):
             status_key = "idle"
             status_emoji = Icons.STOP
             accent_color = Theme.IDLE
-        status_title = f"{status_emoji} {t(status_key)}"
+        
+        if cover_path:
+            dominant = get_dominant_color(cover_path)
+            if dominant:
+                accent_color = dominant
+
+        channel_mention = f"<#{radio.voice_channel_id}>" if radio.voice_channel_id else "???"
         master_container = Container(accent_color=accent_color)
-        thumb = None
-        if cover_path and Path(cover_path).exists():
-            thumb = Thumbnail(f"attachment://cover.png")
-        truncated_artist = fixed(song.get('artist', 'Unknown'), 36).strip()
-        truncated_title  = fixed(song.get('title', 'Unknown'), 36).strip()
-        truncated_album  = fixed(song.get('album', 'Unknown'), 36).strip()
-        channel_mention = f"<#{radio.voice_channel_id}>"
+        thumb = Thumbnail("attachment://cover.png") if cover_path else None
+        elapsed = int(radio.track_start_offset)
+        if radio.track_start_time and radio.status == RadioStatusEnum.PLAYING:
+            import asyncio
+            elapsed += int(asyncio.get_event_loop().time() - radio.track_start_time)
+        duration = song.get('duration', 0)
+        elapsed = min(elapsed, duration)
+        
+        status_title = f"{status_emoji} {t(status_key).upper()}"
+        truncated_artist = fixed(song.get('artist', 'Unknown'), 32).strip()
+        truncated_title = fixed(song.get('title', 'Unknown'), 32).strip()
+        truncated_album = fixed(song.get('album', 'Unknown'), 32).strip()
+
+        def create_progress_bar(current, total, width=18):
+            if total <= 0:
+                return f"{Icons.PB_START}{str(Icons.PB_EMPTY) * (width-2)}{Icons.PB_RIGHT}"
+            
+            progress = min(1.0, max(0.0, current / total))
+            filled_count = int(progress * (width - 1))
+            
+            parts = []
+            for i in range(width):
+                if i == 0:
+                    parts.append(Icons.PB_START if filled_count == 0 else Icons.PB_LEFT)
+                elif i == width - 1:
+                    parts.append(Icons.PB_END if progress >= 1.0 else Icons.PB_RIGHT)
+                elif i == filled_count:
+                    parts.append(Icons.PB_KNOB)
+                elif i < filled_count:
+                    parts.append(Icons.PB_FULL)
+                else:
+                    parts.append(Icons.PB_EMPTY)
+            
+            return "".join(map(str, parts))
+
+        time_readout = f"`{format_duration(elapsed)} / {format_duration(duration)}`"
+        progress_bar = create_progress_bar(elapsed, duration)
+
         info_lines = [
             f"**{status_title}**",
             f"**{t('artist')}:** {truncated_artist}",
             f"**{t('title')}:** {truncated_title}",
             f"**{t('album')}:** {truncated_album}",
             f"**{t('genre')}:** {song.get('genre', 'Unknown').upper()}",
-            f"**{t('duration')}:** {format_duration(song.get('duration', 0))}",
-            f"**{t('likes')}:** {song.get('likes', 0)} | **{t('dislikes')}:** {song.get('dislikes', 0)}"
+            f"**{t('likes')}:** {song.get('likes', 0)} | **{t('dislikes')}:** {song.get('dislikes', 0)}",
+            f"\n{time_readout}\n",
+            f"{progress_bar}"
         ]
         if radio.show_details:
             info_lines.append(f"\n**{Icons.INFO} {t('details_label')}**")
@@ -652,10 +690,9 @@ class NowPlayingView(BaseView):
         library_row.add_item(LikeButton(radio))
         library_row.add_item(DislikeButton(radio))
         library_row.add_item(FavoriteButton(radio, is_favorited=self.is_favorited))
-        from ui_search import SearchButton
-        from ui_studio import PlaylistViewButton
+        from ui_search import LibraryButton, SearchButton
+        library_row.add_item(LibraryButton(radio))
         library_row.add_item(SearchButton(radio))
-        library_row.add_item(PlaylistViewButton(radio))
         master_container.add_item(library_row)
         tools_row = ActionRow()
         from ui_search import QueueViewButton

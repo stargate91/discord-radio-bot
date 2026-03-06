@@ -147,7 +147,10 @@ async def radio_player():
                 before_options=before_opts,
                 options=f"-vn {volume_filter}"
             )
+            _radio_ref.track_start_time = asyncio.get_event_loop().time()
+            _radio_ref.track_start_offset = _radio_ref.seek_position or 0.0
             _radio_ref.seek_position = None
+            _radio_ref.track_duration = song.get("duration", 0)
             done = asyncio.Event()
 
             def after_playing(error):
@@ -202,6 +205,7 @@ async def radio_player():
                         elif action == RadioAction.REPLAY:
                             if _radio_ref.status == RadioStatusEnum.PAUSED:
                                 voice.resume()
+                                _radio_ref.track_start_time = asyncio.get_event_loop().time()
                                 _radio_ref.status = RadioStatusEnum.PLAYING
                                 await _update_now_playing_fn(song)
                             else:
@@ -212,11 +216,16 @@ async def radio_player():
                         elif action == RadioAction.PAUSE:
                             if voice.is_playing():
                                 voice.pause()
+                                if _radio_ref.track_start_time:
+                                    _radio_ref.track_start_offset += (asyncio.get_event_loop().time() - _radio_ref.track_start_time)
+                                _radio_ref.track_start_time = None
                                 _radio_ref.status = RadioStatusEnum.PAUSED
                                 await _update_now_playing_fn(song)
                         elif action == RadioAction.STOP:
                             _radio_ref.is_seeking = True
                             _radio_ref.seek_position = 0
+                            _radio_ref.track_start_time = None
+                            _radio_ref.track_start_offset = 0.0
                             _radio_ref.status = RadioStatusEnum.IDLE
                             voice.stop()
                             await _update_now_playing_fn(song)
@@ -235,6 +244,7 @@ async def radio_player():
                         elif action == RadioAction.DISCONNECT:
                             _radio_ref.voice_channel_id = None
                             _radio_ref.embed_manager.save_value("voice_channel_id", None)
+                            _radio_ref.track_start_time = None
                             voice.stop()
                             await _radio_ref.voice.disconnect()
                             _radio_ref.voice = None
@@ -292,6 +302,8 @@ async def radio_player():
             if elapsed_time >= ten_percent_duration:
                 await _radio_ref.db.update_last_played(song["path"])
                 print(f"Play count updated for: {song['path']}")
+            _radio_ref.track_start_time = None
+            _radio_ref.track_start_offset = 0.0
             raw_source.cleanup()
         except Exception as e:
             print("Radio loop crash:", e)

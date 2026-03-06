@@ -44,6 +44,9 @@ class RadioState:
         self.playlist_editor_user: int | None = None
         self.last_editor_page: int = 0
         self.is_compact: bool = (config.default_ui_mode == "compact")
+        self.track_start_time: float | None = None
+        self.track_start_offset: float = 0.0
+        self.track_duration: int = 0
     async def refresh_queue(self):
         self.queue = []
         for _ in range(self.config.queue_refresh_limit):

@@ -42,21 +42,30 @@ async def update_now_playing(song: dict):
         print(f"Failed to update presence: {e}")
     channel = bot.get_channel(config.radio_text_channel_id)
     if not channel:
-        return
+        try:
+            channel = await bot.fetch_channel(config.radio_text_channel_id)
+        except Exception as e:
+            return
+
     if not radio.voice_channel_id:
         if radio.now_playing_message:
             await safe_delete_message(radio.now_playing_message)
             radio.now_playing_message = None
             radio.embed_manager.save_message_id("player", None)
+        
         view = UnifiedStandbyView(radio)
         if not radio.station_message:
             msg_id = radio.embed_manager.load_message_id("station")
             radio.station_message = await safe_fetch_message(channel, msg_id)
+        
         if radio.station_message:
-            try: await radio.station_message.edit(view=view)
-            except: radio.station_message = await channel.send(view=view)
+            try: 
+                await radio.station_message.edit(view=view)
+            except Exception as e: 
+                radio.station_message = await channel.send(view=view)
         else:
             radio.station_message = await channel.send(view=view)
+        
         radio.embed_manager.save_message_id("station", radio.station_message.id)
         return
     station_view = FrequencyStationView(radio)
@@ -123,12 +132,15 @@ async def force_new_embed():
     channel = bot.get_channel(config.radio_text_channel_id)
     if not channel:
         return
+    
     for key in ["player", "station", "queue", "details", "search"]:
         msg_id = radio.embed_manager.load_message_id(key)
-        msg = await safe_fetch_message(channel, msg_id)
-        if msg:
-            await safe_delete_message(msg)
+        if msg_id:
+            msg = await safe_fetch_message(channel, msg_id)
+            if msg:
+                await safe_delete_message(msg)
         radio.embed_manager.save_message_id(key, None)
+    
     radio.now_playing_message = None
     radio.station_message = None
     radio.editing_playlist_id = None

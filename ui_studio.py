@@ -544,7 +544,8 @@ class PlaylistEditorView(PaginatedView):
         playlist_name = current_pl['name'] if current_pl else "Unknown"
         container.add_item(TextDisplay(f"**{t('playlist_editor_title')}: {playlist_name}**"))
         ctrl_row = ActionRow()
-        from ui_search import SearchButton
+        from ui_search import LibraryButton, SearchButton
+        ctrl_row.add_item(LibraryButton(radio))
         ctrl_row.add_item(SearchButton(radio))
         
         if not is_fav:

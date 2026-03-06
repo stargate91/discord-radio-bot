@@ -1,4 +1,6 @@
 import discord
+import os
+from PIL import Image
 
 def format_duration(seconds: int):
     m, s = divmod(seconds, 60)
@@ -44,4 +46,40 @@ async def safe_fetch_message(channel, message_id: int | None):
         return None
     except Exception as e:
         print(f"[UI] Unexpected error fetching message {message_id}: {e}")
+        return None
+
+def get_dominant_color(image_path):
+    """Extracts the most dominant color from an image file."""
+    try:
+        if not image_path or not os.path.exists(image_path):
+            return None
+            
+        with Image.open(image_path) as img:
+            # Convert to RGB and resize to speed up processing
+            img = img.convert("RGB")
+            img = img.resize((100, 100))
+            
+            # Quantize the image to find dominant colors
+            # Using 8 colors gives a good balance between speed and quality
+            quantized = img.quantize(colors=8, method=Image.Quantize.MAXCOVERAGE)
+            
+            # Get the colors in the quantized image
+            palette = quantized.getpalette()
+            color_counts = quantized.getcolors()
+            
+            if not color_counts:
+                return None
+                
+            # Sort by count (frequency)
+            # Filter out extreme blacks/whites if possible, but for simplicity we'll take the most frequent
+            most_frequent = max(color_counts, key=lambda x: x[0])[1]
+            
+            # Extract RGB from the palette
+            r = palette[most_frequent * 3]
+            g = palette[most_frequent * 3 + 1]
+            b = palette[most_frequent * 3 + 2]
+            
+            return (r << 16) | (g << 8) | b
+    except Exception as e:
+        print(f"[UI] Error extracting dominant color: {e}")
         return None

@@ -8,7 +8,7 @@ from player_engine import radio_player, init_player
 import asyncio
 import discord
 from discord import app_commands
-from radio_actions import RadioAction
+from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from commands import setup_commands
 async def main():
     config = load_config()
@@ -48,14 +48,28 @@ async def main():
             await asyncio.sleep(58 * 60)
             await force_new_embed()
 
+    async def progress_update_loop():
+        await bot.wait_until_ready()
+        while not bot.is_closed():
+            await asyncio.sleep(15) 
+            if radio.status == RadioStatusEnum.PLAYING and radio.now_playing_message:
+                try:
+                    await update_now_playing(radio.current_song or {})
+                except:
+                    pass
+
     @bot.event
     async def on_ready():
         print(f"Online as: {bot.user}")
-        genres = await db.get_all_genres()
-        bot.add_view(UnifiedStandbyView(radio))
-        bot.add_view(FrequencyStationView(radio))
-        bot.add_view(NowPlayingView(radio, genres=genres))
-        await force_new_embed()
+        try:
+            genres = await db.get_all_genres()
+            bot.add_view(UnifiedStandbyView(radio))
+            bot.add_view(FrequencyStationView(radio))
+            bot.add_view(NowPlayingView(radio, genres=genres))
+            await force_new_embed()
+        except Exception as e:
+            print(f"Error during on_ready: {e}")
+
         try:
             guild_id = config.guild_id
             if guild_id and guild_id != "YOUR_GUILD_ID":
@@ -71,6 +85,7 @@ async def main():
         if not radio.task:
             radio.task = bot.loop.create_task(radio_player())
         bot.loop.create_task(embed_refresh_loop())
+        bot.loop.create_task(progress_update_loop())
         monitor = start_monitoring(config, db, bot.loop)
         if monitor:
             radio.monitor = monitor

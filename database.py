@@ -312,17 +312,21 @@ class DatabaseManager:
                 VALUES (?, ?)
             """, (song_path, cover_path))
             await db.commit()
-    async def search_songs(self, query: str) -> list[dict]:
+    async def search_songs(self, query: str = "") -> list[dict]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
+            if not query.strip():
+                # If no query, return all songs sorted by artist/title
+                async with db.execute("SELECT * FROM songs ORDER BY artist ASC, title ASC") as cursor:
+                    rows = await cursor.fetchall()
+                    return [dict(row) for row in rows]
+
             fts_query = query.replace('"', "").replace("'", "")
-            if not fts_query.strip(): return []
             sql = """
                 SELECT s.* FROM songs s
                 JOIN songs_fts f ON s.id = f.rowid
                 WHERE songs_fts MATCH ?
                 ORDER BY rank
-                LIMIT 100
             """
             try:
                 prepared_query = " ".join([f"{word}*" for word in fts_query.split()])
@@ -341,7 +345,7 @@ class DatabaseManager:
                 where_clauses.append("(artist LIKE ? OR title LIKE ? OR album LIKE ?)")
                 params.extend([pattern, pattern, pattern])
             where_sql = " AND ".join(where_clauses)
-            sql = f"SELECT * FROM songs WHERE {where_sql} LIMIT 100"
+            sql = f"SELECT * FROM songs WHERE {where_sql}"
             async with db.execute(sql, tuple(params)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
@@ -353,8 +357,12 @@ class DatabaseManager:
             """, (artist,)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
-    async def search_artists(self, query: str) -> list[str]:
+    async def search_artists(self, query: str = "") -> list[str]:
         async with self.connect() as db:
+            if not query.strip():
+                async with db.execute("SELECT DISTINCT artist FROM songs WHERE artist IS NOT NULL ORDER BY artist ASC") as cursor:
+                    rows = await cursor.fetchall()
+                    return [row[0] for row in rows]
             search_pattern = f"%{query}%"
             start_pattern = f"{query}%"
             sql = """
@@ -371,9 +379,13 @@ class DatabaseManager:
             async with db.execute(sql, (query, start_pattern, search_pattern)) as cursor:
                 rows = await cursor.fetchall()
                 return [row[0] for row in rows]
-    async def search_albums(self, query: str) -> list[dict]:
+    async def search_albums(self, query: str = "") -> list[dict]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
+            if not query.strip():
+                async with db.execute("SELECT DISTINCT artist, album FROM songs WHERE album IS NOT NULL ORDER BY album ASC") as cursor:
+                    rows = await cursor.fetchall()
+                    return [dict(row) for row in rows]
             search_pattern = f"%{query}%"
             start_pattern = f"{query}%"
             sql = """
@@ -496,6 +508,43 @@ class DatabaseManager:
             else:
                 sql = "SELECT * FROM playlists ORDER BY name ASC"
                 params = ()
+            async with db.execute(sql, params) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+    async def search_playlists(self, query: str = "", user_id: int | None = None) -> list[dict]:
+        async with self.connect() as db:
+            db.row_factory = aiosqlite.Row
+            if not query.strip():
+                # If no query, return all playlists with user's ones first
+                sql = """
+                    SELECT *, 0 as match_priority,
+                    CASE WHEN user_id = ? THEN 0 ELSE 1 END as user_priority
+                    FROM playlists
+                    ORDER BY user_priority ASC, name ASC
+                """
+                async with db.execute(sql, (user_id,)) as cursor:
+                    rows = await cursor.fetchall()
+                    return [dict(row) for row in rows]
+
+            search_pattern = f"%{query}%"
+            start_pattern = f"{query}%"
+            sql = """
+                SELECT *,
+                    CASE
+                        WHEN name = ? THEN 1
+                        WHEN name LIKE ? THEN 2
+                        ELSE 3
+                    END as match_priority,
+                    CASE
+                        WHEN user_id = ? THEN 0
+                        ELSE 1
+                    END as user_priority
+                FROM playlists
+                WHERE name LIKE ?
+                ORDER BY match_priority ASC, user_priority ASC, name ASC
+                LIMIT 100
+            """
+            params = (query, start_pattern, user_id, search_pattern)
             async with db.execute(sql, params) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]

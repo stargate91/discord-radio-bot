@@ -55,3 +55,12 @@ class Icons:
     HEART_PLUS = discord.PartialEmoji.from_str("<:heartplus:1478958134981820496>")
     HEART_MINUS = discord.PartialEmoji.from_str("<:heartminus:1478958133526270143>")
     FOLDER_HEART = discord.PartialEmoji.from_str("<:folderheart:1478959293867757618>")
+    LIBRARY = discord.PartialEmoji.from_str("<:foldersearch:1479318922334568468>")
+    
+    PB_START = discord.PartialEmoji.from_str("<:pbleftfullstart:1479349705011105915>")
+    PB_LEFT = discord.PartialEmoji.from_str("<:pbleftfull:1479349704016920656>")
+    PB_FULL = discord.PartialEmoji.from_str("<:pbfull:1479349702880137437>")
+    PB_KNOB = discord.PartialEmoji.from_str("<:pbdivider:1479349699835072573>")
+    PB_EMPTY = discord.PartialEmoji.from_str("<:pbempty:1479349701450137660>")
+    PB_RIGHT = discord.PartialEmoji.from_str("<:pbrightempty:1479349706227191828>")
+    PB_END = discord.PartialEmoji.from_str("<:pbrightemptyend:1479349707418636451>")
