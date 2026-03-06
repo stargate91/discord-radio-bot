@@ -74,6 +74,18 @@ async def radio_player():
                 elif action == RadioAction.JOIN:
                     _radio_ref.voice_channel_id = data
                     _radio_ref.embed_manager.save_value("voice_channel_id", data)
+                elif action == RadioAction.DISCONNECT:
+                    _radio_ref.voice_channel_id = None
+                    _radio_ref.embed_manager.save_value("voice_channel_id", None)
+                    _radio_ref.status = RadioStatusEnum.IDLE
+                    guild = _bot_ref.get_guild(_config_ref.guild_id)
+                    if guild and guild.voice_client:
+                        await guild.voice_client.disconnect()
+                    _radio_ref.voice = None
+                    # CLEAR current song when disconnecting entirely to force standby mode
+                    _radio_ref.current_song = None
+                    await _update_now_playing_fn({})
+                    continue
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
                     await _refresh_ui_fn()
@@ -257,10 +269,15 @@ async def radio_player():
                             _radio_ref.voice_channel_id = None
                             _radio_ref.embed_manager.save_value("voice_channel_id", None)
                             _radio_ref.track_start_time = None
+                            _radio_ref.status = RadioStatusEnum.IDLE
                             voice.stop()
-                            await _radio_ref.voice.disconnect()
+                            guild = _bot_ref.get_guild(_config_ref.guild_id)
+                            if guild and guild.voice_client:
+                                await guild.voice_client.disconnect()
                             _radio_ref.voice = None
-                            await _update_now_playing_fn(song)
+                            # Clear current song to force standby UI
+                            _radio_ref.current_song = None
+                            await _update_now_playing_fn({})
                             break
                         elif action == RadioAction.SET_GENRE:
                             _radio_ref.genre = data

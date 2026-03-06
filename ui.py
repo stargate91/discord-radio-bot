@@ -50,7 +50,7 @@ async def update_now_playing(song: dict):
     is_idle = radio.status == RadioStatusEnum.IDLE
     has_no_song = not song or not song.get("path")
     
-    if not radio.voice_channel_id or is_idle or has_no_song:
+    if not radio.voice_channel_id or has_no_song:
         if radio.now_playing_message:
             await safe_delete_message(radio.now_playing_message)
             radio.now_playing_message = None
