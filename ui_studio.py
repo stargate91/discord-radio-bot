@@ -182,8 +182,7 @@ class RescanLibraryButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
-        if self.radio.config.admin_role_id not in user_role_ids:
+        if not self.radio.is_admin(interaction.user):
             await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
@@ -218,6 +217,9 @@ class AddGenreModal(Modal):
 
     @handle_ui_error
     async def on_submit(self, interaction: discord.Interaction):
+        if not self.radio.is_admin(interaction.user):
+            await interaction.response.send_message(t("admin_only"), ephemeral=True)
+            return
         genre_name = self.genre_input.value.strip()
         # Clean paths: strip whitespace and replace backslashes (Windows) with forward slashes
         paths = [p.strip().replace("\\", "/") for p in self.paths_input.value.split(",") if p.strip()]
@@ -247,15 +249,7 @@ class AddGenreButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        is_admin = False
-        if interaction.user.id == interaction.guild.owner_id:
-            is_admin = True
-        elif self.radio.config.admin_role_id > 0:
-            role = interaction.guild.get_role(self.radio.config.admin_role_id)
-            if role and role in interaction.user.roles:
-                is_admin = True
-        
-        if not is_admin:
+        if not self.radio.is_admin(interaction.user):
             await interaction.response.send_message(t("admin_only"), ephemeral=True)
             return
 
@@ -274,8 +268,7 @@ class PathUpdateButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
-        if self.radio.config.admin_role_id not in user_role_ids:
+        if not self.radio.is_admin(interaction.user):
             await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
             return
         await interaction.response.send_modal(PathUpdateModal(self.radio))
@@ -293,6 +286,9 @@ class PathUpdateModal(Modal):
 
     @handle_ui_error
     async def on_submit(self, interaction: discord.Interaction):
+        if not self.radio.is_admin(interaction.user):
+            await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
+            return
         await interaction.response.defer(ephemeral=True)
         await interaction.followup.send(t("updating_tags") or "Updating tags, please wait...", ephemeral=True)
         
@@ -491,8 +487,7 @@ class DeleteHistoryButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
-        if self.radio.config.admin_role_id not in user_role_ids:
+        if not self.radio.is_admin(interaction.user):
             await interaction.response.send_message(t("no_permission_general"), ephemeral=True); return
         await interaction.response.defer(ephemeral=True)
         await self.db.clear_history()

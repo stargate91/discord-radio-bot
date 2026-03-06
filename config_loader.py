@@ -28,6 +28,7 @@ class Config:
         self.genres = data.get("genres", {})
         self.ffmpeg_path = data.get("ffmpeg_path", "ffmpeg")
         self.admin_role_id = int(data.get("admin_role_id", 0))
+        self.sysadmin_role_id = int(data.get("sysadmin_role_id", 0))
         self.restricted_channels = {
             int(k): int(v) for k, v in data.get("restricted_channels", {}).items()
         }
@@ -52,6 +53,25 @@ class Config:
         self.theme_accent = int(theme_data.get("accent", "0x5865F2"), 16)
         self.cleanup_interval_days = int(data.get("cleanup_interval_days", 7))
         self.scan_interval_days = int(data.get("scan_interval_days", 1))
+        
+        self.db_path = data.get("db_path", "data/radio.db")
+        
+        timings = data.get("timings", {})
+        self.embed_refresh_minutes = int(timings.get("embed_refresh_minutes", 58))
+        self.progress_update_seconds = int(timings.get("progress_update_seconds", 15))
+        self.history_save_seconds = int(timings.get("history_save_seconds", 2))
+        self.play_count_threshold_percent = float(timings.get("play_count_threshold_percent", 0.1))
+        self.error_retry_seconds = int(timings.get("error_retry_seconds", 5))
+        
+        defaults = data.get("defaults", {})
+        self.default_volume = float(defaults.get("volume", 0.5))
+        self.autocomplete_limit = int(defaults.get("autocomplete_limit", 25))
+        
+        self.languages = data.get("languages", [
+            {"code": "en", "label": "English", "emoji": "🇺🇸"},
+            {"code": "hu", "label": "Magyar", "emoji": "🇭🇺"}
+        ])
+
         self.token = os.getenv("DISCORD_TOKEN")
         if not self.token:
             raise RuntimeError("DISCORD_TOKEN missing from .env")

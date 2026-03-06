@@ -82,7 +82,6 @@ async def radio_player():
                     if guild and guild.voice_client:
                         await guild.voice_client.disconnect()
                     _radio_ref.voice = None
-                    # CLEAR current song when disconnecting entirely to force standby mode
                     _radio_ref.current_song = None
                     await _update_now_playing_fn({})
                     continue
@@ -157,7 +156,7 @@ async def radio_player():
             if not song:
                 print("There is no track in this:", _radio_ref.genre)
                 _radio_ref.status = RadioStatusEnum.IDLE
-                await asyncio.sleep(5)
+                await asyncio.sleep(_config_ref.error_retry_seconds)
                 continue
             _radio_ref.status = RadioStatusEnum.PLAYING
             print("Playing:", song)
@@ -188,11 +187,11 @@ async def radio_player():
                 await asyncio.sleep(0.05)
             await _update_now_playing_fn(song)
             song_duration = song.get("duration", 0)
-            ten_percent_duration = int(song_duration * 0.1)
+            ten_percent_duration = int(song_duration * _config_ref.play_count_threshold_percent)
             start_time = asyncio.get_event_loop().time()
             history_saved = False
             while not done.is_set():
-                if not history_saved and (asyncio.get_event_loop().time() - start_time >= 2.0):
+                if not history_saved and (asyncio.get_event_loop().time() - start_time >= _config_ref.history_save_seconds):
                     user_id = _radio_ref.last_user.id if _radio_ref.last_user else None
                     await _radio_ref.db.add_to_history(song["path"], user_id)
                     history_saved = True
@@ -340,4 +339,4 @@ async def radio_player():
             print("Radio loop crash:", e)
             import traceback
             traceback.print_exc()
-            await asyncio.sleep(5)
+            await asyncio.sleep(_config_ref.error_retry_seconds)

@@ -12,7 +12,7 @@ from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from commands import setup_commands
 async def main():
     config = load_config()
-    db = DatabaseManager()
+    db = DatabaseManager(config.db_path)
     await db.initialize()
     import time
     last_cleanup = await db.get_metadata("last_cleanup", "0")
@@ -45,13 +45,13 @@ async def main():
     async def embed_refresh_loop():
         await bot.wait_until_ready()
         while not bot.is_closed():
-            await asyncio.sleep(58 * 60)
+            await asyncio.sleep(config.embed_refresh_minutes * 60)
             await force_new_embed()
 
     async def progress_update_loop():
         await bot.wait_until_ready()
         while not bot.is_closed():
-            await asyncio.sleep(15) 
+            await asyncio.sleep(config.progress_update_seconds)
             if radio.status == RadioStatusEnum.PLAYING and radio.now_playing_message:
                 try:
                     await update_now_playing(radio.current_song or {})

@@ -39,10 +39,10 @@ class StationSelect(discord.ui.Select):
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         channel_id = int(self.values[0])
-        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
-        is_admin = self.radio.config.admin_role_id in user_role_ids
+        is_admin = self.radio.is_admin(interaction.user)
         if channel_id in self.radio.config.restricted_channels and not is_admin:
             required_role_id = self.radio.config.restricted_channels[channel_id]
+            user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
             if required_role_id not in user_role_ids:
                 await interaction.response.send_message(t("no_permission"), ephemeral=True)
                 return
@@ -54,8 +54,11 @@ class LanguageSelect(discord.ui.Select):
     def __init__(self, radio):
         self.radio = radio
         options = [
-            discord.SelectOption(label="English", value="en", emoji=Icons.LANG_EN),
-            discord.SelectOption(label="Magyar", value="hu", emoji=Icons.LANG_HU)
+            discord.SelectOption(
+                label=lang["label"], 
+                value=lang["code"], 
+                emoji=lang.get("emoji")
+            ) for lang in radio.config.languages
         ]
         super().__init__(
             placeholder=t("placeholder_lang"),
@@ -70,7 +73,9 @@ class LanguageSelect(discord.ui.Select):
         selected = self.values[0]
         self.radio.language = selected
         self.radio.dispatch(RadioAction.SET_LANGUAGE, selected, user=interaction.user)
-        msg = "English language selected" if selected == "en" else "Magyar nyelv kiválasztva"
+        selected_lang = next((l for l in self.radio.config.languages if l["code"] == selected), None)
+        label = selected_lang["label"] if selected_lang else selected
+        msg = f"Language selected: **{label}**" if selected == "en" else f"Nyelv kiválasztva: **{label}**"
         await interaction.response.send_message(msg, ephemeral=True)
 
 class UIModeSelect(discord.ui.Select):

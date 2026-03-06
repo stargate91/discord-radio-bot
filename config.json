@@ -17,10 +17,35 @@
         "wav"
     ],
     "admin_role_id": 0,
+    "sysadmin_role_id": 0,
     "restricted_channels": {
         "CHANNEL_ID": "ROLE_ID"
     },
     "ffmpeg_path": "ffmpeg",
+    "db_path": "data/radio.db",
+    "timings": {
+        "embed_refresh_minutes": 58,
+        "progress_update_seconds": 15,
+        "history_save_seconds": 2,
+        "play_count_threshold_percent": 0.1,
+        "error_retry_seconds": 5
+    },
+    "defaults": {
+        "volume": 0.5,
+        "autocomplete_limit": 25
+    },
+    "languages": [
+        {
+            "code": "en",
+            "label": "English",
+            "emoji": "🇬🇧"
+        },
+        {
+            "code": "hu",
+            "label": "Magyar",
+            "emoji": "🇭🇺"
+        }
+    ],
     "ui_settings": {
         "search_items_per_page": 5,
         "history_items_per_page": 5,

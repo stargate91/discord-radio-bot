@@ -9,8 +9,9 @@ DB_FILE = DB_DIR / "radio.db"
 
 class DatabaseManager:
 
-    def __init__(self):
-        self.db_file = DB_FILE
+    def __init__(self, db_path: str = "data/radio.db"):
+        self.db_file = Path(db_path)
+        self.db_file.parent.mkdir(parents=True, exist_ok=True)
     async def initialize(self):
         async with self.connect() as db:
             await db.execute("PRAGMA journal_mode=WAL;")

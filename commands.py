@@ -51,7 +51,7 @@ def setup_commands(tree, radio):
             return []
         results = await db.search_songs(current)
         choices = []
-        for s in results[:25]:
+        for s in results[:radio.config.autocomplete_limit]:
             label = f"{s['artist']} - {s['title']}"
             if len(label) > 100: label = label[:97] + "..."
             choices.append(app_commands.Choice(name=label, value=str(s['id'])))

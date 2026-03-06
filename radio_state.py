@@ -4,6 +4,23 @@ from radio_actions import RadioState as RadioStatusEnum, RadioAction
 from embed_state import EmbedStateManager
 
 class RadioState:
+    def is_admin(self, user: discord.Member | discord.User) -> bool:
+        if not isinstance(user, discord.Member):
+            return False
+        
+        if user.guild_permissions.administrator:
+            return True
+
+        if user.id == user.guild.owner_id:
+            return True
+
+        user_role_ids = [role.id for role in user.roles]
+        if self.config.admin_role_id > 0 and self.config.admin_role_id in user_role_ids:
+            return True
+        if self.config.sysadmin_role_id > 0 and self.config.sysadmin_role_id in user_role_ids:
+            return True
+        
+        return False
 
     def __init__(self, config, db):
         self.config = config
@@ -16,7 +33,7 @@ class RadioState:
         self.current_song: dict | None = None
         self.seek_position: int | None = None
         self.is_seeking: bool = False
-        self.volume: float = 0.5
+        self.volume: float = config.default_volume
         self.now_playing_message: discord.Message | None = None
         self.station_message: discord.Message | None = None
         self.queue: list[dict] = []
