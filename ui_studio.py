@@ -195,6 +195,73 @@ class RescanLibraryButton(discord.ui.Button):
             ephemeral=True
         )
 
+class AddGenreModal(Modal):
+    def __init__(self, radio):
+        super().__init__(title=t("add_genre_modal_title"))
+        self.radio = radio
+        self.genre_input = TextInput(
+            label=t("genre_name_label"),
+            placeholder="e.g. Synthwave",
+            required=True,
+            min_length=2,
+            max_length=50
+        )
+        self.paths_input = TextInput(
+            label=t("folder_paths_label"),
+            placeholder="C:/Music/Genre1, D:/Music/Genre2",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            min_length=3
+        )
+        self.add_item(self.genre_input)
+        self.add_item(self.paths_input)
+
+    @handle_ui_error
+    async def on_submit(self, interaction: discord.Interaction):
+        genre_name = self.genre_input.value.strip()
+        # Clean paths: strip whitespace and replace backslashes (Windows) with forward slashes
+        paths = [p.strip().replace("\\", "/") for p in self.paths_input.value.split(",") if p.strip()]
+        
+        if not genre_name or not paths:
+            await interaction.response.send_message(t("invalid_input"), ephemeral=True)
+            return
+            
+        current_genres = self.radio.config.genres.copy()
+        current_genres[genre_name] = paths
+        self.radio.config.save_genres(current_genres)
+        
+        await interaction.response.send_message(t("genre_added_success").format(genre=genre_name), ephemeral=True)
+        
+        from scanner import scan_music_library
+        await scan_music_library(self.radio.config, self.radio.db)
+
+class AddGenreButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=t("add_genre_label"),
+            style=discord.ButtonStyle.secondary,
+            emoji=Icons.FOLDER_ADD,
+            custom_id="add_genre_button"
+        )
+        self.radio = radio
+
+    @handle_ui_error
+    async def callback(self, interaction: discord.Interaction):
+        is_admin = False
+        if interaction.user.id == interaction.guild.owner_id:
+            is_admin = True
+        elif self.radio.config.admin_role_id > 0:
+            role = interaction.guild.get_role(self.radio.config.admin_role_id)
+            if role and role in interaction.user.roles:
+                is_admin = True
+        
+        if not is_admin:
+            await interaction.response.send_message(t("admin_only"), ephemeral=True)
+            return
+
+        await interaction.response.send_modal(AddGenreModal(self.radio))
+
+
 class PathUpdateButton(discord.ui.Button):
     def __init__(self, radio):
         super().__init__(

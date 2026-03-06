@@ -54,9 +54,26 @@ class Config:
         self.scan_interval_days = int(data.get("scan_interval_days", 1))
         self.token = os.getenv("DISCORD_TOKEN")
         if not self.token:
-            raise RuntimeError(
-                "DISCORD_TOKEN missing from .env"
-            )
+            raise RuntimeError("DISCORD_TOKEN missing from .env")
+    def save_genres(self, new_genres: dict):
+        self.genres = new_genres
+        path = get_config_path()
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data["genres"] = new_genres
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            
+    def save_config_value(self, key: str, value):
+        path = get_config_path()
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data[key] = value
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            
+    def get_token(self):
+        return os.getenv("DISCORD_TOKEN")
 
 def load_config():
     path = get_config_path()

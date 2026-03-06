@@ -18,6 +18,8 @@ class Icons:
     VOLUME = discord.PartialEmoji.from_str("<:volume2:1478347170959589468>")
     SEARCH = discord.PartialEmoji.from_str("<:search:1478333583797256292>")
     INFO = discord.PartialEmoji.from_str("<:folder:1478333582761132112>")
+    FOLDER = INFO
+    FOLDER_ADD = discord.PartialEmoji.from_str("<:folderplus:1479482634953429054>")
     GENRE = discord.PartialEmoji.from_str("<:tag:1478347206355456031>")
     HISTORY = discord.PartialEmoji.from_str("<:scrolltext:1478347243428905061>")
     CALENDAR = discord.PartialEmoji.from_str("<:calendardays:1478347283429982299>")

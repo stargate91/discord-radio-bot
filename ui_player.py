@@ -514,7 +514,7 @@ class UnifiedStandbyView(BaseView):
             row_ui.add_item(UIModeSelect(radio))
             station_container.add_item(row_ui)
             station_container.add_item(Separator())
-            from ui_studio import PlaylistStudioButton, RescanLibraryButton, PathUpdateButton
+            from ui_studio import PlaylistStudioButton, RescanLibraryButton, PathUpdateButton, AddGenreButton
             from ui_feedback import FeedbackButton
             
             row_main = ActionRow()
@@ -524,6 +524,7 @@ class UnifiedStandbyView(BaseView):
             
             row_admin = ActionRow()
             row_admin.add_item(RescanLibraryButton(radio))
+            row_admin.add_item(AddGenreButton(radio))
             row_admin.add_item(PathUpdateButton(radio))
             station_container.add_item(row_admin)
         self.add_item(station_container)
