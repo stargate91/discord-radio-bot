@@ -31,7 +31,7 @@ class RadioState:
         self.last_history_page: int = 0
         self.filter_from: str = None
         self.filter_to: str = None
-        self.status = RadioStatusEnum.PLAYING
+        self.status = RadioStatusEnum.IDLE
         self.is_back_action: bool = False
         self.is_forward_action: bool = False
         self.action_queue = asyncio.Queue()

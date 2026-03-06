@@ -195,6 +195,53 @@ class RescanLibraryButton(discord.ui.Button):
             ephemeral=True
         )
 
+class PathUpdateButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=t("path_update_label") or "Path Update",
+            style=discord.ButtonStyle.secondary,
+            emoji=Icons.INFO,
+            custom_id="path_update_button"
+        )
+        self.radio = radio
+
+    @handle_ui_error
+    async def callback(self, interaction: discord.Interaction):
+        user_role_ids = [role.id for role in interaction.user.roles] if hasattr(interaction.user, 'roles') else []
+        if self.radio.config.admin_role_id not in user_role_ids:
+            await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
+            return
+        await interaction.response.send_modal(PathUpdateModal(self.radio))
+
+class PathUpdateModal(Modal):
+    def __init__(self, radio):
+        super().__init__(title=t("path_update_modal_title") or "Update Tags by Path")
+        self.radio = radio
+        self.path_input = TextInput(
+            label=t("path_input_label") or "Directory Path",
+            placeholder="F:\\music\\labels\\audio_swarm",
+            required=True
+        )
+        self.add_item(self.path_input)
+
+    @handle_ui_error
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        await interaction.followup.send(t("updating_tags") or "Updating tags, please wait...", ephemeral=True)
+        
+        from scanner import scan_specific_path
+        inserted, skipped, error = await scan_specific_path(self.path_input.value, self.radio.config, self.radio.db, force=True)
+        
+        if error:
+            error_msg = t(error) if error in ["unauthorized_path"] else error
+            await interaction.followup.send(f"{Icons.WARNING} **Error:** {error_msg}", ephemeral=True)
+        else:
+            await interaction.followup.send(
+                f"{Icons.SUCCESS} " + (t("update_complete").format(inserted=inserted, skipped=skipped) if t("update_complete") 
+                else f"Update complete. Updated: {inserted}, Unchanged: {skipped}"),
+                ephemeral=True
+            )
+
 class ExitStudioButton(discord.ui.Button):
 
     def __init__(self, radio):

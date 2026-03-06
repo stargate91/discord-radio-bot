@@ -82,6 +82,24 @@ async def main():
                 print("Slash commands synced globally!")
         except Exception as e:
             print(f"Failed to sync commands: {e}")
+            
+        if config.auto_join_channel_id > 0:
+            try:
+                channel = bot.get_channel(config.auto_join_channel_id)
+                if not channel:
+                    channel = await bot.fetch_channel(config.auto_join_channel_id)
+                
+                if channel and isinstance(channel, discord.VoiceChannel):
+                    if not channel.guild.voice_client:
+                        print(f"[SYSTEM] Auto-joining channel: {channel.name}")
+                        await channel.connect()
+                        radio.voice_channel_id = channel.id
+                        radio.voice = channel.guild.voice_client
+                        radio.status = RadioStatusEnum.IDLE
+                        radio.embed_manager.save_message_id("player", None)
+            except Exception as e:
+                print(f"[SYSTEM] Auto-join failed: {e}")
+
         if not radio.task:
             radio.task = bot.loop.create_task(radio_player())
         bot.loop.create_task(embed_refresh_loop())

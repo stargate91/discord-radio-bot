@@ -121,7 +121,6 @@ class SearchModal(Modal):
         view = SearchResultsView(self.radio, results, query, interaction.user, search_type=search_type, existing_paths=existing_paths, all_playlists=all_playlists)
         msg = await interaction.channel.send(view=view)
         self.radio.embed_manager.save_message_id("search", msg.id)
-        await interaction.followup.send("Search results updated.", ephemeral=True)
 
 class AddSongButton(discord.ui.Button):
 

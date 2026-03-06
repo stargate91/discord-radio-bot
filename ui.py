@@ -47,12 +47,16 @@ async def update_now_playing(song: dict):
         except Exception as e:
             return
 
-    if not radio.voice_channel_id:
+    is_idle = radio.status == RadioStatusEnum.IDLE
+    has_no_song = not song or not song.get("path")
+    
+    if not radio.voice_channel_id or is_idle or has_no_song:
         if radio.now_playing_message:
             await safe_delete_message(radio.now_playing_message)
             radio.now_playing_message = None
             radio.embed_manager.save_message_id("player", None)
         
+        # Always show standby view if idle or no song, even if in voice channel
         view = UnifiedStandbyView(radio)
         if not radio.station_message:
             msg_id = radio.embed_manager.load_message_id("station")

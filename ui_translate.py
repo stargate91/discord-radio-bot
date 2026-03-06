@@ -166,7 +166,13 @@ LOCALES = {
         "added_to_favs": "Added to favourites:",
         "removed_from_favs": "Removed from favourites:",
         "fav_add_label": "Favorite",
-        "fav_rem_label": "Unfavorite"
+        "fav_rem_label": "Unfavorite",
+        "path_update_label": "Path Update",
+        "path_update_modal_title": "Update Tags by Path",
+        "path_input_label": "Directory Path",
+        "updating_tags": "Updating tags, please wait...",
+        "update_complete": "Update complete. Updated: {inserted}, Unchanged: {skipped}",
+        "unauthorized_path": "This path is not within your configured genre directories. Access denied."
     },
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
@@ -333,7 +339,13 @@ LOCALES = {
         "added_to_favs": "Hozzáadva a kedvencekhez:",
         "removed_from_favs": "Eltávolítva a kedvencekből:",
         "fav_add_label": "Kedvenc",
-        "fav_rem_label": "Mégsem"
+        "fav_rem_label": "Mégsem",
+        "path_update_label": "Útvonal Frissítése",
+        "path_update_modal_title": "Tagek frissítése útvonal alapján",
+        "path_input_label": "Mappa elérési útja",
+        "updating_tags": "Tagek frissítése folyamatban, kérlek várj...",
+        "update_complete": "Frissítés kész! {inserted} dal frissítve, {skipped} változatlan.",
+        "unauthorized_path": "Ez az útvonal nem szerepel a beállított stílusok (genre) mappái között. Hozzáférés megtagadva."
     }
 }
 _radio_ref = None

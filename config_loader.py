@@ -14,6 +14,7 @@ class Config:
     def __init__(self, data: dict):
         self.guild_id = int(data["guild_id"])
         self.voice_channel_id = int(data["voice_channel_id"])
+        self.auto_join_channel_id = int(data.get("auto_join_channel_id", 0))
         self.radio_text_channel_id = int(data["radio_text_channel_id"])
         self.feedback_channel_id = int(data.get("feedback_channel_id", 0))
         self.afk_channel_id = int(data.get("afk_channel_id", 0))

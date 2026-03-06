@@ -184,6 +184,49 @@ async def scan_music_library(config, db, force=False):
         await conn.commit()
     print(f"[SCAN] Scan finished. Total: {count}, Added: {inserted}, Skipped: {skipped}")
     return inserted, skipped
+async def scan_specific_path(target_path_str: str, config, db, force=True):
+    target_path = Path(target_path_str).resolve()
+    if not target_path.exists():
+        return 0, 0, "Directory does not exist."
+    
+    assigned_genre = None
+    for g, paths in config.genres.items():
+        for p in paths:
+            genre_root = Path(p).resolve()
+            try:
+                if target_path == genre_root or target_path.is_relative_to(genre_root):
+                    assigned_genre = g
+                    break
+            except (ValueError, TypeError):
+                if str(target_path).lower().startswith(str(genre_root).lower()):
+                    assigned_genre = g
+                    break
+        if assigned_genre:
+            break
+            
+    if not assigned_genre:
+        return 0, 0, "unauthorized_path"
+    
+    inserted = 0
+    skipped = 0
+    count = 0
+    async with db.connect() as conn:
+        for root, _, files in os.walk(target_path):
+            for file in files:
+                ext = Path(file).suffix.lower().replace(".", "")
+                if ext not in config.supported_extensions:
+                    continue
+                full_path = Path(root) / file
+                if await process_song(full_path, assigned_genre, config, db, conn, force=force):
+                    inserted += 1
+                else:
+                    skipped += 1
+                count += 1
+                if count % 50 == 0:
+                    await conn.commit()
+        await conn.commit()
+    return inserted, skipped, None
+
 async def cleanup_database(db):
     paths = await db.get_all_song_paths()
     removed = 0

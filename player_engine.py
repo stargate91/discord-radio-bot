@@ -40,7 +40,17 @@ async def radio_player():
                 if action == RadioAction.JOIN:
                     _radio_ref.voice_channel_id = data
                     _radio_ref.embed_manager.save_value("voice_channel_id", data)
+                    _radio_ref.status = RadioStatusEnum.PLAYING
                     await _update_now_playing_fn(_radio_ref.current_song or {})
+                elif action == RadioAction.ADD_TO_QUEUE:
+                    # If someone wants to play a song but bot isn't in a channel, try to join them
+                    user = _radio_ref.last_user
+                    if user and hasattr(user, 'voice') and user.voice:
+                        _radio_ref.voice_channel_id = user.voice.channel.id
+                        _radio_ref.embed_manager.save_value("voice_channel_id", user.voice.channel.id)
+                        _radio_ref.queue.insert(0, data)
+                        _radio_ref.status = RadioStatusEnum.PLAYING
+                        print(f"[SYSTEM] Auto-joining {user.display_name} in {user.voice.channel.name} to play requested song.")
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
                     await _refresh_ui_fn()
@@ -64,11 +74,13 @@ async def radio_player():
                 elif action == RadioAction.JOIN:
                     _radio_ref.voice_channel_id = data
                     _radio_ref.embed_manager.save_value("voice_channel_id", data)
-                    continue
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
                     await _refresh_ui_fn()
                     continue
+                elif action == RadioAction.ADD_TO_QUEUE:
+                    _radio_ref.queue.insert(0, data)
+                    _radio_ref.is_seeking = False
                 else:
                     continue
                 _radio_ref.status = RadioStatusEnum.PLAYING
@@ -102,7 +114,7 @@ async def radio_player():
                     await _refresh_ui_fn()
                     print(f"[ACTION HANDLED] SET_LANGUAGE: Language set to {data}")
                 elif action == RadioAction.ADD_TO_QUEUE:
-                    _radio_ref.queue.append(data)
+                    _radio_ref.queue.insert(0, data)
                 elif action == RadioAction.REMOVE_FROM_QUEUE:
                     if data in _radio_ref.queue:
                         _radio_ref.queue.remove(data)
@@ -257,9 +269,11 @@ async def radio_player():
                             voice.stop()
                             break
                         elif action == RadioAction.ADD_TO_QUEUE:
-                            _radio_ref.queue.append(data)
-                            await _update_now_playing_fn(song)
-                            print(f"[PROCESS] ADD_TO_QUEUE: {data.get('title')} appended to queue")
+                            _radio_ref.queue.insert(0, data)
+                            _radio_ref.is_seeking = False
+                            voice.stop()
+                            print(f"[PROCESS] ADD_TO_QUEUE: Instant switch to {data.get('title')}")
+                            break
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)

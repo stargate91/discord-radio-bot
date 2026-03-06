@@ -47,7 +47,7 @@ class StationSelect(discord.ui.Select):
                 await interaction.response.send_message(t("no_permission"), ephemeral=True)
                 return
         self.radio.dispatch(RadioAction.JOIN, channel_id, user=interaction.user)
-        await interaction.response.send_message(t("syncing"), ephemeral=True)
+        await interaction.response.defer()
 
 class LanguageSelect(discord.ui.Select):
 
@@ -112,7 +112,7 @@ class DisconnectButton(discord.ui.Button):
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         self.radio.dispatch(RadioAction.DISCONNECT, user=interaction.user)
-        await interaction.response.send_message(t("severing"), ephemeral=True)
+        await interaction.response.defer()
 
 class GenreSelect(discord.ui.Select):
 
@@ -137,7 +137,7 @@ class GenreSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
         self.radio.dispatch(RadioAction.SET_GENRE, selected, user=interaction.user)
-        await interaction.response.send_message(f"{t('switching_genre')} **{selected.upper()}**", ephemeral=True)
+        await interaction.response.defer()
 
 class PlayPauseButton(discord.ui.Button):
 
@@ -157,10 +157,9 @@ class PlayPauseButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.radio.status == RadioStatusEnum.PAUSED or self.radio.status == RadioStatusEnum.IDLE:
             self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
-            await interaction.response.send_message(t("resuming_feedback"), ephemeral=True)
         else:
             self.radio.dispatch(RadioAction.PAUSE, user=interaction.user)
-            await interaction.response.send_message(t("pausing"), ephemeral=True)
+        await interaction.response.defer()
 
 class StopButton(discord.ui.Button):
 
@@ -176,7 +175,7 @@ class StopButton(discord.ui.Button):
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         self.radio.dispatch(RadioAction.STOP, user=interaction.user)
-        await interaction.response.send_message(t("stopping"), ephemeral=True)
+        await interaction.response.defer()
 
 class ForwardButton(discord.ui.Button):
 
@@ -193,7 +192,7 @@ class ForwardButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
             self.radio.dispatch(RadioAction.FORWARD, user=interaction.user)
-            await interaction.response.send_message(t("forwarding"), ephemeral=True)
+            await interaction.response.defer()
         else:
             await interaction.response.send_message(t("nothing_playing"), ephemeral=True)
 
@@ -212,7 +211,7 @@ class RandomButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.radio.voice and (self.radio.voice.is_playing() or self.radio.voice.is_paused()):
             self.radio.dispatch(RadioAction.SKIP, user=interaction.user)
-            await interaction.response.send_message(t("randomizing"), ephemeral=True)
+            await interaction.response.defer()
         else:
             await interaction.response.send_message(t("nothing_playing"), ephemeral=True)
 
@@ -230,7 +229,7 @@ class ShuffleButton(discord.ui.Button):
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         self.radio.dispatch(RadioAction.SHUFFLE, user=interaction.user)
-        await interaction.response.send_message(t("shuffle_feedback"), ephemeral=True)
+        await interaction.response.defer()
 
 class BackButton(discord.ui.Button):
 
@@ -259,7 +258,7 @@ class BackButton(discord.ui.Button):
         prev_song = await self.db.get_previous_song(self.radio.last_history_paths)
         if prev_song:
             self.radio.dispatch(RadioAction.BACK, prev_song, user=interaction.user)
-            await interaction.response.send_message(f"{t('jumping')} **{prev_song.get('artist')} - {prev_song.get('title')}**", ephemeral=True)
+            await interaction.response.defer()
         else:
             await interaction.response.send_message(t("back_error"), ephemeral=True)
 
@@ -312,7 +311,7 @@ class SeekModal(Modal):
             await interaction.response.send_message(t("too_long"), ephemeral=True)
             return
         self.radio.dispatch(RadioAction.SEEK, total_seconds, user=interaction.user)
-        await interaction.response.send_message(f"{t('jumping')} {ts}...", ephemeral=True)
+        await interaction.response.defer()
 
 class VolumeButton(discord.ui.Button):
 
@@ -355,7 +354,7 @@ class VolumeModal(Modal):
             await interaction.response.send_message(t("vol_range_error"), ephemeral=True)
             return
         self.radio.dispatch(RadioAction.SET_VOLUME, value / 100, user=interaction.user)
-        await interaction.response.send_message(f"{t('vol_set')} {value}%", ephemeral=True)
+        await interaction.response.defer()
 
 class LikeButton(discord.ui.Button):
 
@@ -474,13 +473,9 @@ class DetailsButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
         self.radio.show_details = not self.radio.show_details
         if _update_callback: await _update_callback(self.radio.current_song)
-        await interaction.followup.send(
-            f"{t('info_visibility')}: **{t('shown')}**" if self.radio.show_details else f"{t('info_visibility')}: **{t('hidden')}**",
-            ephemeral=True
-        )
+        await interaction.response.defer()
 
 class QueueToggleButton(discord.ui.Button):
 
@@ -495,13 +490,9 @@ class QueueToggleButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
         self.radio.show_queue = not self.radio.show_queue
         if _update_callback: await _update_callback(self.radio.current_song)
-        await interaction.followup.send(
-            f"{t('queue_visibility')}: **{t('shown')}**" if self.radio.show_queue else f"{t('queue_visibility')}: **{t('hidden')}**",
-            ephemeral=True
-        )
+        await interaction.response.defer()
 
 class UnifiedStandbyView(BaseView):
 
@@ -523,13 +514,18 @@ class UnifiedStandbyView(BaseView):
             row_ui.add_item(UIModeSelect(radio))
             station_container.add_item(row_ui)
             station_container.add_item(Separator())
-            row_studio = ActionRow()
-            from ui_studio import PlaylistStudioButton, RescanLibraryButton
+            from ui_studio import PlaylistStudioButton, RescanLibraryButton, PathUpdateButton
             from ui_feedback import FeedbackButton
-            row_studio.add_item(PlaylistStudioButton(radio))
-            row_studio.add_item(RescanLibraryButton(radio))
-            row_studio.add_item(FeedbackButton(radio))
-            station_container.add_item(row_studio)
+            
+            row_main = ActionRow()
+            row_main.add_item(PlaylistStudioButton(radio))
+            row_main.add_item(FeedbackButton(radio))
+            station_container.add_item(row_main)
+            
+            row_admin = ActionRow()
+            row_admin.add_item(RescanLibraryButton(radio))
+            row_admin.add_item(PathUpdateButton(radio))
+            station_container.add_item(row_admin)
         self.add_item(station_container)
         standby_container = Container(accent_color=Theme.BACKGROUND)
         standby_container.add_item(TextDisplay(f"**{t('standby_mode')}**\n{t('standby_subtitle')}"))
