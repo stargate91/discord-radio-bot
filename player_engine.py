@@ -187,12 +187,15 @@ async def radio_player():
                     _radio_ref.voice_channel_id = None
                     _radio_ref.embed_manager.save_value("voice_channel_id", None)
                     _radio_ref.status = RadioStatusEnum.IDLE
+                    _radio_ref.current_song = None
+                    _radio_ref.voice = None
                     guild = _bot_ref.get_guild(_config_ref.guild_id)
                     if guild and guild.voice_client:
                         await guild.voice_client.disconnect()
-                    _radio_ref.voice = None
-                    _radio_ref.current_song = None
-                    await _update_now_playing_fn({})
+                    if _cleanup_ui_fn:
+                        await _cleanup_ui_fn()
+                    else:
+                        await _update_now_playing_fn({})
                     continue
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
@@ -230,10 +233,15 @@ async def radio_player():
                 elif action == RadioAction.DISCONNECT:
                     _radio_ref.voice_channel_id = None
                     _radio_ref.embed_manager.save_value("voice_channel_id", None)
+                    _radio_ref.status = RadioStatusEnum.IDLE
+                    _radio_ref.current_song = None
                     if _radio_ref.voice:
                         await _radio_ref.voice.disconnect()
                         _radio_ref.voice = None
-                    await _update_now_playing_fn(_radio_ref.current_song or {})
+                    if _cleanup_ui_fn:
+                        await _cleanup_ui_fn()
+                    else:
+                        await _update_now_playing_fn({})
                     print(f"[ACTION HANDLED] DISCONNECT: Voice client disconnected")
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data

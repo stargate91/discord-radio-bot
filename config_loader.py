@@ -22,9 +22,25 @@ class Config:
         self.default_language = data.get("default_language", "en")
         self.default_ui_mode = data.get("default_ui_mode", "full")
         self.default_presence = data.get("default_presence", "Waiting for signal...")
+        scanner = data.get("scanner", {})
         self.supported_extensions = set(
-            data.get("supported_extensions", [])
+            scanner.get("supported_extensions", data.get("supported_extensions", ["mp3", "flac", "wav"]))
         )
+        self.cover_filenames = scanner.get("cover_filenames", [
+            "cover.jpg", "cover.png", "cover.jpeg", "folder.jpg", "folder.png", "front.jpg", "front.png"
+        ])
+        self.metadata_fields = scanner.get("metadata_fields", {
+            "artist": ["artist", "ARTIST", "TPE1"],
+            "title": ["title", "TITLE", "TIT2"],
+            "album": ["album", "ALBUM", "TALB"],
+            "date": ["date", "DATE", "year", "YEAR", "TDRC"],
+            "label": ["organization", "ORGANIZATION", "TPUB"],
+            "catnum": ["catalognumber", "CATALOGNUMBER", "TXXX:CATALOGNUMBER"],
+            "mediatype_flac": ["mediatype", "MEDIATYPE"],
+            "mediatype_mp3": ["TMED"],
+            "rating": ["rating", "RATING", "POPM"]
+        })
+        self.locales = scanner # Alias for scanner settings as requested
         self.genres = data.get("genres", {})
         self.virtual_genres = data.get("virtual_genres", [])
         self.ffmpeg_path = data.get("ffmpeg_path", "ffmpeg")

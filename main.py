@@ -123,8 +123,10 @@ async def main():
             elif old_channel:
                 radio.voice_channel_id = None
                 radio.voice = None
+                radio.status = RadioStatusEnum.IDLE
+                radio.current_song = None
                 radio.embed_manager.save_value("voice_channel_id", None)
-                await update_now_playing(radio.current_song or {})
+                await update_now_playing({})
                 print(f"[VOICE] Bot disconnected from voice")
         
         # AFK Check logic: Disconnect if bot is left alone for X seconds

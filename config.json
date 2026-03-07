@@ -11,11 +11,70 @@
     "default_language": "en",
     "default_ui_mode": "full",
     "default_presence": "Waiting for signal...",
-    "supported_extensions": [
-        "mp3",
-        "flac",
-        "wav"
-    ],
+    "scanner": {
+        "supported_extensions": [
+            "mp3",
+            "flac",
+            "wav",
+            "m4a",
+            "ogg"
+        ],
+        "cover_filenames": [
+            "cover.jpg",
+            "cover.png",
+            "cover.jpeg",
+            "folder.jpg",
+            "folder.png",
+            "front.jpg",
+            "front.png"
+        ],
+        "metadata_fields": {
+            "artist": [
+                "artist",
+                "ARTIST",
+                "TPE1"
+            ],
+            "title": [
+                "title",
+                "TITLE",
+                "TIT2"
+            ],
+            "album": [
+                "album",
+                "ALBUM",
+                "TALB"
+            ],
+            "date": [
+                "date",
+                "DATE",
+                "year",
+                "YEAR",
+                "TDRC"
+            ],
+            "label": [
+                "organization",
+                "ORGANIZATION",
+                "TPUB"
+            ],
+            "catnum": [
+                "catalognumber",
+                "CATALOGNUMBER",
+                "TXXX:CATALOGNUMBER"
+            ],
+            "mediatype_flac": [
+                "mediatype",
+                "MEDIATYPE"
+            ],
+            "mediatype_mp3": [
+                "TMED"
+            ],
+            "rating": [
+                "rating",
+                "RATING",
+                "POPM"
+            ]
+        }
+    },
     "cleanup_interval_days": 14,
     "scan_interval_days": 1,
     "ffmpeg_path": "ffmpeg",
