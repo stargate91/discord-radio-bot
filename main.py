@@ -126,6 +126,30 @@ async def main():
                 radio.embed_manager.save_value("voice_channel_id", None)
                 await update_now_playing(radio.current_song or {})
                 print(f"[VOICE] Bot disconnected from voice")
+        
+        # AFK Check logic: Disconnect if bot is left alone for X seconds
+        voice_client = member.guild.voice_client
+        if voice_client and voice_client.channel:
+            real_members = [m for m in voice_client.channel.members if not m.bot]
+            if len(real_members) == 0:
+                if not radio.afk_task:
+                    async def afk_timer():
+                        try:
+                            await asyncio.sleep(config.afk_timeout_seconds)
+                            print(f"[AFK] Channel {voice_client.channel.name} empty for {config.afk_timeout_seconds}s. Auto-exiting.")
+                            radio.dispatch(RadioAction.DISCONNECT, user=bot.user)
+                        except asyncio.CancelledError:
+                            pass
+                        finally:
+                            radio.afk_task = None
+                    
+                    radio.afk_task = asyncio.create_task(afk_timer())
+                    print(f"[AFK] Bot is alone in {voice_client.channel.name}. Timer started ({config.afk_timeout_seconds}s).")
+            else:
+                if radio.afk_task:
+                    radio.afk_task.cancel()
+                    radio.afk_task = None
+                    print(f"[AFK] User joined {voice_client.channel.name}. Timer cancelled.")
     async with bot:
         await bot.start(config.token)
 if __name__ == "__main__":

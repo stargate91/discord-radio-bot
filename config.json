@@ -20,13 +20,16 @@
     "scan_interval_days": 1,
     "ffmpeg_path": "ffmpeg",
     "db_path": "data/radio.db",
-    "restricted_channels": {},
+    "restricted_channels": {
+        "CHANNEL_ID": "ROLE_ID"
+    },
     "timings": {
         "embed_refresh_minutes": 58,
         "progress_update_seconds": 15,
         "history_save_seconds": 2,
         "play_count_threshold_percent": 0.1,
-        "error_retry_seconds": 5
+        "error_retry_seconds": 5,
+        "afk_timeout_seconds": 120
     },
     "defaults": {
         "volume": 0.5,
@@ -64,6 +67,31 @@
             "accent": "0x5865F2"
         }
     },
-    "genres": {},
-    "virtual_genres": []
+    "genres": {
+        "Electronic": [
+            "C:/Music/Electronic"
+        ],
+        "Rock": [
+            "C:/Music/Rock"
+        ]
+    },
+    "virtual_genres": [],
+    "__HELP__": {
+        "guild_id": "Main Discord server ID.",
+        "voice_channel_id": "Primary voice channel where the bot stays.",
+        "auto_join_channel_id": "Optional. If set (>0), bot joins this on startup.",
+        "radio_text_channel_id": "Channel where the Now Playing embed is pinned.",
+        "feedback_channel_id": "Where user feedback/bugs are sent. 0 to disable.",
+        "afk_channel_id": "Channel to ignore in the station list (e.g. AFK/Dead channel).",
+        "admin_role_id": "Role ID that gets bot admin permissions.",
+        "sysadmin_role_id": "Role ID for system-level bot maintenance.",
+        "cleanup_interval_days": "How often to remove missing files from DB.",
+        "scan_interval_days": "How often to check for new music files.",
+        "restricted_channels": "Map of {ChannelID: RoleID} to lock channels to specific roles.",
+        "timings.embed_refresh_minutes": "Periodic refresh of the Now Playing embed.",
+        "timings.history_save_seconds": "Secs after which a track is added to personal history.",
+        "timings.play_count_threshold_percent": "Percent (0.1 = 10%) played to count as 1 view.",
+        "defaults.volume": "Initial volume for the player (0.0 to 1.0).",
+        "defaults.autocomplete_limit": "Max results shown in slash command search."
+    }
 }

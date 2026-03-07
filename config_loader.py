@@ -62,6 +62,7 @@ class Config:
         self.history_save_seconds = int(timings.get("history_save_seconds", 2))
         self.play_count_threshold_percent = float(timings.get("play_count_threshold_percent", 0.1))
         self.error_retry_seconds = int(timings.get("error_retry_seconds", 5))
+        self.afk_timeout_seconds = int(timings.get("afk_timeout_seconds", 120))
         
         defaults = data.get("defaults", {})
         self.default_volume = float(defaults.get("volume", 0.5))

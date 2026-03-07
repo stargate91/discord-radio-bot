@@ -64,6 +64,7 @@ class RadioState:
         self.track_start_time: float | None = None
         self.track_start_offset: float = 0.0
         self.track_duration: int = 0
+        self.afk_task: asyncio.Task | None = None
     async def refresh_queue(self):
         self.queue = []
         for _ in range(self.config.queue_refresh_limit):
@@ -77,12 +78,9 @@ class RadioState:
             self.last_user = user
         self.action_queue.put_nowait((action, data))
     async def get_random_song_by_genre(self, genre: str):
-        # Check for virtual genres first
         for vg in self.config.virtual_genres:
             if vg["name"].lower() == genre.lower():
                 return await self.db.get_random_song_by_rating(min_rating=vg.get("min_rating", 5))
-        
-        # Fallback to standard database genre lookup
         return await self.db.get_random_song_by_genre(genre)
 
     async def get_all_genres(self):
