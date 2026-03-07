@@ -147,8 +147,7 @@ async def force_new_embed():
     
     radio.now_playing_message = None
     radio.station_message = None
-    radio.editing_playlist_id = None
-    radio.playlist_editor_user = None
+    # No longer global state here, users carry their own editor state
     await update_now_playing(radio.current_song or {})
 async def refresh_all_uis():
     await update_now_playing(radio.current_song or {})
@@ -175,12 +174,14 @@ async def refresh_all_uis():
             results = radio.last_search_results
             query = radio.last_search_query
             user = radio.last_search_user
+            user_id = user.id if user else (radio.last_user.id if radio.last_user else 0)
+            editing_pid = radio.get_editing_playlist(user_id)
             existing_paths = set()
             all_playlists = []
-            if radio.editing_playlist_id:
-                playlist_songs = await radio.db.get_playlist_songs(radio.editing_playlist_id)
+            if editing_pid:
+                playlist_songs = await radio.db.get_playlist_songs(editing_pid)
                 existing_paths = {s['path'] for s in playlist_songs}
-                all_playlists = await radio.db.get_all_playlists()
+                all_playlists = await radio.db.get_all_playlists(user_id)
             await msg.edit(view=SearchResultsView(
                 radio, results, query, user,
                 page=radio.last_search_page,
@@ -189,12 +190,16 @@ async def refresh_all_uis():
                 all_playlists=all_playlists
             ))
         elif radio.active_view_type == "studio":
-            playlists = await radio.db.get_all_playlists(radio.playlist_editor_user, strictly_personal=True)
+            user_id = radio.last_user.id if radio.last_user else 0
+            playlists = await radio.db.get_all_playlists(user_id, strictly_personal=True)
             await msg.edit(view=PlaylistStudioView(radio, playlists=playlists))
-        elif radio.active_view_type == "playlist_editor" and radio.editing_playlist_id:
-            songs = await radio.db.get_playlist_songs(radio.editing_playlist_id)
-            all_playlists = await radio.db.get_all_playlists(radio.playlist_editor_user, strictly_personal=True)
-            await msg.edit(view=PlaylistEditorView(radio, radio.editing_playlist_id, page=radio.last_editor_page, songs=songs, all_playlists=all_playlists))
+        elif radio.active_view_type == "playlist_editor":
+            user_id = radio.last_user.id if radio.last_user else 0
+            editing_pid = radio.get_editing_playlist(user_id)
+            if editing_pid:
+                songs = await radio.db.get_playlist_songs(editing_pid)
+                all_playlists = await radio.db.get_all_playlists(user_id, strictly_personal=True)
+                await msg.edit(view=PlaylistEditorView(radio, editing_pid, page=radio.last_editor_page, songs=songs, all_playlists=all_playlists))
         elif radio.active_view_type == "queue":
             await msg.edit(view=FullQueueView(radio, page=radio.last_queue_page))
     except Exception as e:

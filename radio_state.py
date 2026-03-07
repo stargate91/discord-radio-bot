@@ -57,8 +57,9 @@ class RadioState:
         self.last_history_paths: list[str] = []
         self.last_back_time: float = 0.0
         self.forward_stack: list[dict] = []
-        self.editing_playlist_id: int | None = None
-        self.playlist_editor_user: int | None = None
+        self.user_editor_state: dict[int, int] = {} # user_id -> editing_playlist_id
+        self.playlist_locks: dict[int, int] = {} # playlist_id -> user_id
+        self.global_locks: dict[str, int] = {} # resource_type -> user_id
         self.last_editor_page: int = 0
         self.is_compact: bool = (config.default_ui_mode == "compact")
         self.track_start_time: float | None = None
@@ -90,6 +91,15 @@ class RadioState:
         # Return merged list, ensuring no duplicates and sorting
         all_genres = list(set(db_genres + virtual_names))
         return sorted(all_genres, key=lambda s: s.lower())
+
+    def get_editing_playlist(self, user_id: int) -> int | None:
+        return self.user_editor_state.get(user_id)
+        
+    def set_editing_playlist(self, user_id: int, playlist_id: int | None):
+        if playlist_id is None:
+            self.user_editor_state.pop(user_id, None)
+        else:
+            self.user_editor_state[user_id] = playlist_id
 
     def get_display_queue(self):
         return list(reversed(self.forward_stack)) + self.queue

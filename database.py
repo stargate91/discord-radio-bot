@@ -316,11 +316,15 @@ class DatabaseManager:
     async def search_songs(self, query: str = "") -> list[dict]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
-            if not query.strip():
-                # If no query, return all songs sorted by artist/title
-                async with db.execute("SELECT * FROM songs ORDER BY artist ASC, title ASC") as cursor:
-                    rows = await cursor.fetchall()
-                    return [dict(row) for row in rows]
+            # If no query, return all songs sorted by artist/title, nulls at the end
+            async with db.execute("""
+                SELECT * FROM songs 
+                ORDER BY (artist IS NULL OR artist = ''), 
+                         (title IS NULL OR title = ''), 
+                         artist ASC, title ASC
+            """) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
 
             fts_query = query.replace('"', "").replace("'", "")
             sql = """
@@ -346,7 +350,13 @@ class DatabaseManager:
                 where_clauses.append("(artist LIKE ? OR title LIKE ? OR album LIKE ?)")
                 params.extend([pattern, pattern, pattern])
             where_sql = " AND ".join(where_clauses)
-            sql = f"SELECT * FROM songs WHERE {where_sql}"
+            sql = f"""
+                SELECT * FROM songs 
+                WHERE {where_sql} 
+                ORDER BY (artist IS NULL OR artist = ''), 
+                         (title IS NULL OR title = ''), 
+                         artist ASC, title ASC
+            """
             async with db.execute(sql, tuple(params)) as cursor:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]

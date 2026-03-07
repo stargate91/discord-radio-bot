@@ -38,12 +38,7 @@ def setup_commands(tree, radio):
         top_songs = await db.get_top_songs(days=days)
         top_users = await db.get_top_users(days=days)
         view = StatsView(radio, interaction.user, guild=interaction.guild, top_artists=top_artists, top_songs=top_songs, top_users=top_users)
-        old_id = radio.embed_manager.load_message_id("search")
-        msg = await safe_fetch_message(interaction.channel, old_id)
-        if msg:
-            await safe_delete_message(msg)
-        msg = await interaction.followup.send(view=view, wait=True)
-        radio.embed_manager.save_message_id("search", msg.id)
+        await interaction.followup.send(view=view, ephemeral=True)
 
     @play.autocomplete('query')
     async def play_autocomplete(interaction: discord.Interaction, current: str):

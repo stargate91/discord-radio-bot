@@ -557,7 +557,9 @@ class FrequencyStationView(BaseView):
             station_container.add_item(Separator())
             row_meta = ActionRow()
             from ui_feedback import FeedbackButton
+            from ui_studio import PlaylistStudioButton
             row_meta.add_item(DisconnectButton(radio))
+            row_meta.add_item(PlaylistStudioButton(radio))
             row_meta.add_item(FeedbackButton(radio))
             station_container.add_item(row_meta)
         self.add_item(station_container)
