@@ -75,8 +75,9 @@ class LanguageSelect(discord.ui.Select):
         self.radio.dispatch(RadioAction.SET_LANGUAGE, selected, user=interaction.user)
         selected_lang = next((l for l in self.radio.config.languages if l["code"] == selected), None)
         label = selected_lang["label"] if selected_lang else selected
-        msg = f"Language selected: **{label}**" if selected == "en" else f"Nyelv kiválasztva: **{label}**"
-        await interaction.response.send_message(msg, ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        try: await interaction.delete_original_response()
+        except: pass
 
 class UIModeSelect(discord.ui.Select):
 
@@ -98,8 +99,9 @@ class UIModeSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         selected = self.values[0]
         self.radio.is_compact = (selected == "compact")
-        msg = t("ui_mode_compact") if self.radio.is_compact else t("ui_mode_full")
-        await interaction.response.send_message(f"UI Mode: **{msg}**", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        try: await interaction.delete_original_response()
+        except: pass
         if _update_callback:
             await _update_callback(self.radio.current_song or {})
 
@@ -418,10 +420,8 @@ class DislikeButton(discord.ui.Button):
             if _update_callback: await _update_callback(updated_song)
         artist = updated_song.get("artist") or "Unknown Artist"
         title = updated_song.get("title") or "Unknown Title"
-        if status == "added": msg = f"{t('disliked')} **{artist} - {title}**"
-        elif status == "removed": msg = f"{t('dislike_withdrawn')} **{artist} - {title}**"
-        msg = f"{t('disliked_replaced')} **{artist} - {title}**"
-        await interaction.followup.send(msg, ephemeral=True)
+        try: await interaction.delete_original_response()
+        except: pass
 
 class FavoriteButton(discord.ui.Button):
     def __init__(self, radio, is_favorited=False):

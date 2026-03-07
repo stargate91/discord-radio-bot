@@ -167,7 +167,6 @@ class DeletePlaylistButton(discord.ui.Button):
         self.radio.editing_playlist_id = None
         playlists = await self.db.get_all_playlists(self.radio.playlist_editor_user, strictly_personal=True)
         await interaction.edit_original_response(view=PlaylistStudioView(self.radio, playlists=playlists))
-        await interaction.followup.send(t("playlist_deleted"), ephemeral=True)
 
 class RescanLibraryButton(discord.ui.Button):
 
@@ -186,13 +185,10 @@ class RescanLibraryButton(discord.ui.Button):
             await interaction.response.send_message(t("no_permission_general"), ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
-        await interaction.followup.send(t("rescanning"), ephemeral=True)
         from scanner import scan_music_library
-        inserted, skipped = await scan_music_library(self.radio.config, self.radio.db, force=True)
-        await interaction.followup.send(
-            t("rescan_complete").format(inserted=inserted, skipped=skipped),
-            ephemeral=True
-        )
+        await scan_music_library(self.radio.config, self.radio.db, force=True)
+        try: await interaction.delete_original_response()
+        except: pass
 
 class AddGenreModal(Modal):
     def __init__(self, radio):
@@ -232,7 +228,9 @@ class AddGenreModal(Modal):
         current_genres[genre_name] = paths
         self.radio.config.save_genres(current_genres)
         
-        await interaction.response.send_message(t("genre_added_success").format(genre=genre_name), ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        try: await interaction.delete_original_response()
+        except: pass
         
         from scanner import scan_music_library
         await scan_music_library(self.radio.config, self.radio.db)
@@ -299,11 +297,8 @@ class PathUpdateModal(Modal):
             error_msg = t(error) if error in ["unauthorized_path"] else error
             await interaction.followup.send(f"{Icons.WARNING} **Error:** {error_msg}", ephemeral=True)
         else:
-            await interaction.followup.send(
-                f"{Icons.SUCCESS} " + (t("update_complete").format(inserted=inserted, skipped=skipped) if t("update_complete") 
-                else f"Update complete. Updated: {inserted}, Unchanged: {skipped}"),
-                ephemeral=True
-            )
+            try: await interaction.delete_original_response()
+            except: pass
 
 class ExitStudioButton(discord.ui.Button):
 
@@ -409,12 +404,7 @@ class HistoryButton(discord.ui.Button):
         self.radio.filter_from = None
         self.radio.filter_to = None
         view = HistoryView(self.radio, history, total_count, page=0, user=interaction.user)
-        search_id = self.radio.embed_manager.load_message_id("search")
-        msg = await safe_fetch_message(interaction.channel, search_id)
-        if msg:
-            await safe_delete_message(msg)
-        msg = await interaction.followup.send(view=view, wait=True)
-        self.radio.embed_manager.save_message_id("search", msg.id)
+        await interaction.followup.send(view=view, ephemeral=True)
 
 class HistoryFilterButton(discord.ui.Button):
 
@@ -496,7 +486,6 @@ class DeleteHistoryButton(discord.ui.Button):
         total_count = await self.db.get_history_count()
         view = HistoryView(self.radio, history, total_count, page=0, user=interaction.user)
         await interaction.edit_original_response(view=view)
-        await interaction.followup.send(t("history_cleared"), ephemeral=True)
 
 class StatsButton(discord.ui.Button):
 
@@ -728,9 +717,9 @@ class HistoryView(PaginatedView):
         @handle_ui_error
         async def close_callback(interaction):
             await interaction.response.defer()
-            self.radio.embed_manager.save_message_id("search", None)
             self.radio.active_view_type = None
-            await safe_delete_message(interaction.message)
+            try: await interaction.delete_original_response()
+            except: pass
         close_btn.callback = close_callback
         ctrl_row = ActionRow()
         ctrl_row.add_item(HistoryFilterButton(self.radio))

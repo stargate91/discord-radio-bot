@@ -139,9 +139,8 @@ class AddSongButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
             await self.radio.db.add_song_to_playlist(self.radio.editing_playlist_id, self.song['path'])
-            await interaction.followup.send(f"{t('song_added_to_playlist')} **{self.song['artist']} - {self.song['title']}**", ephemeral=True)
             search_id = self.radio.embed_manager.load_message_id("search")
             msg = await safe_fetch_message(interaction.channel, search_id)
             if msg:
@@ -159,9 +158,8 @@ class AddSongButton(discord.ui.Button):
                 except Exception as e:
                     print(f"DEBUG: Refresh failed: {e}")
         else:
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
             self.radio.dispatch(RadioAction.ADD_TO_QUEUE, self.song, user=interaction.user)
-            await interaction.followup.send(f"{t('add_to_queue')} **{self.song['artist']} - {self.song['title']}**", ephemeral=True)
 
 class TabButton(discord.ui.Button):
 
@@ -247,10 +245,9 @@ class QueueAllButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if self.radio.editing_playlist_id:
             if await check_editor_lock(self.radio, interaction): return
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
             for song in self.songs:
                 await self.radio.db.add_song_to_playlist(self.radio.editing_playlist_id, song['path'])
-            await interaction.followup.send(t('bulk_added_to_playlist').format(count=len(self.songs)), ephemeral=True)
             search_id = self.radio.embed_manager.load_message_id("search")
             msg = await safe_fetch_message(interaction.channel, search_id)
             if msg:
@@ -268,10 +265,9 @@ class QueueAllButton(discord.ui.Button):
                 except Exception as e:
                     print(f"[UI] Failed to refresh search after bulk add: {e}")
         else:
-            await interaction.response.defer(ephemeral=True)
+            await interaction.response.defer()
             for song in self.songs:
                 self.radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
-            await interaction.followup.send(t('bulk_added_to_queue').format(count=len(self.songs)), ephemeral=True)
 
 class QueueViewButton(discord.ui.Button):
 

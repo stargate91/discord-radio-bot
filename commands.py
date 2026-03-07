@@ -26,7 +26,8 @@ def setup_commands(tree, radio):
         if radio.voice_channel_id is None:
             radio.dispatch(RadioAction.JOIN, interaction.user.voice.channel.id, user=interaction.user)
         radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
-        await interaction.followup.send(f"Added to queue: **{song['artist']} - {song['title']}**", ephemeral=True)
+        try: await interaction.delete_original_response()
+        except: pass
 
     @tree.command(name="stats", description="Show playback statistics")
     async def stats(interaction: discord.Interaction):
