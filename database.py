@@ -316,15 +316,15 @@ class DatabaseManager:
     async def search_songs(self, query: str = "") -> list[dict]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
-            # If no query, return all songs sorted by artist/title, nulls at the end
-            async with db.execute("""
-                SELECT * FROM songs 
-                ORDER BY (artist IS NULL OR artist = ''), 
-                         (title IS NULL OR title = ''), 
-                         artist ASC, title ASC
-            """) as cursor:
-                rows = await cursor.fetchall()
-                return [dict(row) for row in rows]
+            if not query.strip():
+                async with db.execute("""
+                    SELECT * FROM songs 
+                    ORDER BY (artist IS NULL OR artist = ''), 
+                             (title IS NULL OR title = ''), 
+                             artist ASC, title ASC
+                """) as cursor:
+                    rows = await cursor.fetchall()
+                    return [dict(row) for row in rows]
 
             fts_query = query.replace('"', "").replace("'", "")
             sql = """

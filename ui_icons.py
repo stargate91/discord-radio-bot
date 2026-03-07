@@ -66,3 +66,4 @@ class Icons:
     PB_EMPTY = discord.PartialEmoji.from_str("<:pbempty:1479349701450137660>")
     PB_RIGHT = discord.PartialEmoji.from_str("<:pbrightempty:1479349706227191828>")
     PB_END = discord.PartialEmoji.from_str("<:pbrightemptyend:1479349707418636451>")
+    GLOBE = discord.PartialEmoji.from_str("<:globe:1479722340320542820>")

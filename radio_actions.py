@@ -22,3 +22,4 @@ class RadioAction(Enum):
     SHUFFLE = auto()
     REMOVE_FROM_QUEUE = auto()
     CLEAR_QUEUE = auto()
+    ADD_EXT_LINK = auto()

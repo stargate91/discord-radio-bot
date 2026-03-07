@@ -28,6 +28,7 @@ class LibraryButton(discord.ui.Button):
         
         # Open library showing all playlists by default
         playlists = await self.db.search_playlists("", interaction.user.id)
+        current_view = self.radio.active_view_type
         self.radio.active_view_type = "search"
         self.radio.last_search_query = ""
         self.radio.last_search_results = playlists
@@ -37,7 +38,7 @@ class LibraryButton(discord.ui.Button):
         
         view = SearchResultsView(self.radio, playlists, "", interaction.user, search_type="playlists")
         
-        if self.radio.active_view_type in ["search", "studio", "playlist_editor"]:
+        if current_view in ["search", "studio", "playlist_editor"]:
             # Re-use the existing ephemeral window or search message
             await interaction.edit_original_response(view=view)
         else:
@@ -67,6 +68,47 @@ class SearchButton(discord.ui.Button):
         modal = SearchModal(self.radio)
         await interaction.response.send_modal(modal)
 
+class WebLinkButton(discord.ui.Button):
+    def __init__(self, radio):
+        super().__init__(
+            label=None if radio.is_compact else t('weblink_label'),
+            emoji=Icons.GLOBE,
+            style=discord.ButtonStyle.secondary,
+            custom_id="weblink_button"
+        )
+        self.radio = radio
+
+    @handle_ui_error
+    async def callback(self, interaction: discord.Interaction):
+        editing_pid = self.radio.get_editing_playlist(interaction.user.id)
+        if editing_pid:
+            if await check_editor_lock(self.radio, interaction, editing_pid): return
+        modal = WebLinkModal(self.radio)
+        await interaction.response.send_modal(modal)
+
+class WebLinkModal(Modal):
+    def __init__(self, radio):
+        super().__init__(title=t("weblink_modal_title"))
+        self.radio = radio
+        self.url_input = TextInput(
+            label=t("weblink_input_label"),
+            placeholder="https://youtube.com/watch?v=... or https://soundcloud.com/...",
+            style=discord.TextStyle.short,
+            required=True,
+            min_length=5
+        )
+        self.add_item(self.url_input)
+
+    @handle_ui_error
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        url = self.url_input.value.strip()
+        if not url: return
+        
+        # Dispatch external link action
+        self.radio.dispatch(RadioAction.ADD_EXT_LINK, url, user=interaction.user)
+        await interaction.followup.send(t("weblink_added"), ephemeral=True)
+
 class SearchModal(Modal):
 
     def __init__(self, radio):
@@ -90,13 +132,7 @@ class SearchModal(Modal):
         
         results = []
         if search_type == "songs": 
-            if not query.strip():
-                # For songs, maybe show 50 random?
-                results = await self.db.search_songs("a") # Dummy to get something or add a get_top_songs?
-                # Actually let's just use empty search if supported by DB (already is)
-                results = await self.db.search_songs(query)
-            else:
-                results = await self.db.search_songs(query)
+            results = await self.db.search_songs(query)
         elif search_type == "artists": results = await self.db.search_artists(query)
         elif search_type == "albums": results = await self.db.search_albums(query)
         elif search_type == "playlists": results = await self.db.search_playlists(query, interaction.user.id)
@@ -129,17 +165,14 @@ class SearchModal(Modal):
         view = SearchResultsView(self.radio, results, query, interaction.user, search_type=search_type, existing_paths=existing_paths, all_playlists=all_playlists)
         
         if previous_view in ["search", "studio", "playlist_editor"]:
-            # Re-use the existing ephemeral window (from modal submission, after defer)
             try:
                 await interaction.edit_original_response(view=view)
                 return
             except Exception as e:
                 print(f"[SEARCH] Failed to edit existing message (Modal Edit): {e}")
-                # Fallback to followup if edit fails
                 await interaction.followup.send(view=view, ephemeral=True)
                 return
-        
-        # Fallback for new messages elsewhere
+
         msg = await interaction.channel.send(view=view)
         self.radio.embed_manager.save_message_id("search", msg.id)
 
@@ -343,6 +376,7 @@ class SearchResultsView(PaginatedView):
              if editing_pid:
                  if await check_editor_lock(self.radio, interaction, editing_pid): return
              await interaction.response.defer()
+             self.radio.active_view_type = None
              self.radio.embed_manager.save_message_id("search", None)
              try: await interaction.delete_original_response()
              except: pass

@@ -506,13 +506,12 @@ class StatsButton(discord.ui.Button):
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        current_view = self.radio.active_view_type
         self.radio.active_view_type = "stats"
         days = 7
         top_artists = await self.db.get_top_artists(days=days)
         top_songs = await self.db.get_top_songs(days=days)
         top_users = await self.db.get_top_users(days=days)
-        current_view = self.radio.active_view_type
-        self.radio.active_view_type = "stats"
         view = StatsView(self.radio, interaction.user, period="weekly", guild=interaction.guild, top_artists=top_artists, top_songs=top_songs, top_users=top_users)
         if current_view in ["search", "studio", "playlist_editor", "history"]:
             await interaction.edit_original_response(view=view)

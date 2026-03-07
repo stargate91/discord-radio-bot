@@ -40,7 +40,7 @@ async def main():
     tree = app_commands.CommandTree(bot)
     radio = RadioState(config, db)
     init_ui(bot, config, radio)
-    init_player(bot, config, radio, update_now_playing, refresh_all_uis)
+    init_player(bot, config, radio, update_now_playing, refresh_all_uis, cleanup_fn=force_new_embed)
     setup_commands(tree, radio)
     async def embed_refresh_loop():
         await bot.wait_until_ready()

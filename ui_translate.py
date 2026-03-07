@@ -11,6 +11,7 @@ LOCALES = {
         "presence_listening": "Listening to:",
         "presence_paused": "Paused",
         "artist": "Artist",
+        "uploader": "Uploader",
         "title": "Title",
         "album": "Album",
         "genre": "Genre",
@@ -21,6 +22,7 @@ LOCALES = {
         "label": "Label",
         "catnum": "#CAT",
         "source": "Source",
+        "platform": "Platform",
         "play_count_label": "Plays",
         "last_played_label": "Last played",
         "details_label": "Info",
@@ -179,7 +181,13 @@ LOCALES = {
         "path_input_label": "Enter the exact folder path here",
         "updating_tags": "Updating data... Please wait.",
         "update_complete": "Update done! {inserted} tracks updated, {skipped} stayed the same.",
-        "unauthorized_path": "This folder is not in the allowed locations. Access denied."
+        "unauthorized_path": "This folder is not in the allowed locations. Access denied.",
+        "weblink_label": "Web Link",
+        "weblink_modal_title": "Request Web Link",
+        "weblink_input_label": "YouTube / SoundCloud URL",
+        "weblink_processing": "Processing link, please wait...",
+        "weblink_error": "Invalid or unsupported link!",
+        "weblink_added": "Link added to queue!"
     },
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
@@ -192,6 +200,7 @@ LOCALES = {
         "presence_listening": "Hallgatja:",
         "presence_paused": "Megállítva",
         "artist": "Előadó",
+        "uploader": "Feltöltő",
         "title": "Cím",
         "album": "Album",
         "genre": "Stílus",
@@ -202,6 +211,7 @@ LOCALES = {
         "label": "Kiadó",
         "catnum": "Katalógus #",
         "source": "Forrás",
+        "platform": "Platform",
         "play_count_label": "Lejátszások",
         "last_played_label": "Utoljára szólt",
         "details_label": "Infó",
@@ -360,7 +370,13 @@ LOCALES = {
         "path_input_label": "Itt add meg a mappa pontos helyét",
         "updating_tags": "Adatok frissítése... Kérlek várj.",
         "update_complete": "Frissítés kész! {inserted} dal frissítve, {skipped} maradt a régi.",
-        "unauthorized_path": "Ez a mappa nincs benne a megengedett helyekben. Hozzáférés megtagadva."
+        "unauthorized_path": "Ez a mappa nincs benne a megengedett helyekben. Hozzáférés megtagadva.",
+        "weblink_label": "Web Link",
+        "weblink_modal_title": "Külső Link Hozzáadása",
+        "weblink_input_label": "YouTube / SoundCloud URL",
+        "weblink_processing": "Link feldolgozása, kis türelmet...",
+        "weblink_error": "Érvénytelen vagy nem támogatott link!",
+        "weblink_added": "Link hozzáadva a várólistához!"
     }
 }
 _radio_ref = None

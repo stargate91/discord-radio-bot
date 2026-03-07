@@ -558,6 +558,7 @@ class FrequencyStationView(BaseView):
             row_meta = ActionRow()
             from ui_feedback import FeedbackButton
             from ui_studio import PlaylistStudioButton
+            from ui_search import WebLinkButton
             row_meta.add_item(DisconnectButton(radio))
             row_meta.add_item(PlaylistStudioButton(radio))
             row_meta.add_item(FeedbackButton(radio))
@@ -591,7 +592,13 @@ class NowPlayingView(BaseView):
 
         channel_mention = f"<#{radio.voice_channel_id}>" if radio.voice_channel_id else "???"
         master_container = Container(accent_color=accent_color)
-        thumb = Thumbnail("attachment://cover.png") if cover_path else None
+
+        thumb = None
+        if cover_path:
+            thumb = Thumbnail("attachment://cover.png")
+        elif song.get("thumbnail_url"):
+            thumb = Thumbnail(song["thumbnail_url"])
+            
         elapsed = int(radio.track_start_offset)
         if radio.track_start_time and radio.status == RadioStatusEnum.PLAYING:
             import asyncio
@@ -603,6 +610,7 @@ class NowPlayingView(BaseView):
         truncated_artist = fixed(song.get('artist', 'Unknown'), 32).strip()
         truncated_title = fixed(song.get('title', 'Unknown'), 32).strip()
         truncated_album = fixed(song.get('album', 'Unknown'), 32).strip()
+        is_external = song.get('is_external', False)
 
         def create_progress_bar(current, total, width=18):
             if total <= 0:
@@ -631,20 +639,26 @@ class NowPlayingView(BaseView):
 
         info_lines = [
             f"**{status_title}**",
-            f"**{t('artist')}:** {truncated_artist}",
+            f"**{t('artist') if not is_external else t('uploader')}:** {truncated_artist}",
             f"**{t('title')}:** {truncated_title}",
-            f"**{t('album')}:** {truncated_album}",
-            f"**{t('genre')}:** {song.get('genre', 'Unknown').upper()}",
-            f"**{t('likes')}:** {song.get('likes', 0)} | **{t('dislikes')}:** {song.get('dislikes', 0)}",
+            f"**{t('album') if not is_external else t('platform')}:** {truncated_album}"
+        ]
+        
+        if not is_external:
+            info_lines.append(f"**{t('genre')}:** {song.get('genre', 'Unknown').upper()}")
+            info_lines.append(f"**{t('likes')}:** {song.get('likes', 0)} | **{t('dislikes')}:** {song.get('dislikes', 0)}")
+            
+        info_lines.extend([
             f"\n{time_readout}\n",
             f"{progress_bar}"
-        ]
+        ])
         if radio.show_details:
             info_lines.append(f"\n**{Icons.INFO} {t('details_label')}**")
             info_lines.append(f"**{t('year')}:** {song.get('date', 'Unknown')}")
             info_lines.append(f"**{t('label')}:** {song.get('label', 'Unknown')}")
-            info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown') or 'Unknown'}")
-            info_lines.append(f"**{t('source')}:** {song.get('mediatype_flac') or song.get('mediatype_mp3') or 'Unknown'}")
+            if not is_external:
+                info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown') or 'Unknown'}")
+                info_lines.append(f"**{t('source')}:** {song.get('mediatype_flac') or song.get('mediatype_mp3') or 'Unknown'}")
             info_lines.append(f"**{t('play_count_label')}:** {song.get('play_count', 0)}")
             last_played = song.get('last_played')
             if last_played:
@@ -674,33 +688,39 @@ class NowPlayingView(BaseView):
         genre_row.add_item(GenreSelect(radio, genres))
         master_container.add_item(genre_row)
         master_container.add_item(Separator())
-        playback_row = ActionRow()
-        playback_row.add_item(BackButton(radio))
-        playback_row.add_item(PlayPauseButton(radio))
-        playback_row.add_item(StopButton(radio))
-        playback_row.add_item(ForwardButton(radio))
-        playback_row.add_item(RandomButton(radio))
-        master_container.add_item(playback_row)
-        config_row = ActionRow()
-        config_row.add_item(ShuffleButton(radio))
-        config_row.add_item(SeekButton(radio))
-        config_row.add_item(VolumeButton(radio))
-        config_row.add_item(DetailsButton(radio))
-        config_row.add_item(QueueToggleButton(radio))
-        master_container.add_item(config_row)
-        library_row = ActionRow()
-        library_row.add_item(LikeButton(radio))
-        library_row.add_item(DislikeButton(radio))
-        library_row.add_item(FavoriteButton(radio, is_favorited=self.is_favorited))
-        from ui_search import LibraryButton, SearchButton
-        library_row.add_item(LibraryButton(radio))
-        library_row.add_item(SearchButton(radio))
-        master_container.add_item(library_row)
-        tools_row = ActionRow()
-        from ui_search import QueueViewButton
+        
+        from ui_search import LibraryButton, SearchButton, QueueViewButton, WebLinkButton
         from ui_studio import StatsButton, HistoryButton
-        tools_row.add_item(QueueViewButton(radio))
-        tools_row.add_item(StatsButton(radio))
-        tools_row.add_item(HistoryButton(radio))
-        master_container.add_item(tools_row)
+        
+        all_buttons = [
+            BackButton(radio), PlayPauseButton(radio), StopButton(radio),
+            ForwardButton(radio), RandomButton(radio),
+            ShuffleButton(radio), SeekButton(radio), VolumeButton(radio)
+        ]
+        
+        if not is_external:
+            all_buttons.append(DetailsButton(radio))
+            
+        all_buttons.append(QueueToggleButton(radio))
+        
+        if not is_external:
+            all_buttons.extend([
+                LikeButton(radio), DislikeButton(radio), 
+                FavoriteButton(radio, is_favorited=self.is_favorited)
+            ])
+            
+        all_buttons.extend([
+            LibraryButton(radio), SearchButton(radio),
+            QueueViewButton(radio), WebLinkButton(radio),
+            StatsButton(radio), HistoryButton(radio)
+        ])
+        
+        # 2. Chunk into rows of 5
+        for i in range(0, len(all_buttons), 5):
+            chunk = all_buttons[i : i + 5]
+            row = ActionRow()
+            for btn in chunk:
+                row.add_item(btn)
+            master_container.add_item(row)
+            
         self.add_item(master_container)

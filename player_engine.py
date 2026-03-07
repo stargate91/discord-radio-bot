@@ -2,19 +2,121 @@ import asyncio
 import discord
 from radio_actions import RadioAction, RadioState as RadioStatusEnum
 from ui_icons import Icons
+from ui_translate import t
 _bot_ref = None
 _config_ref = None
 _radio_ref = None
 _update_now_playing_fn = None
 _refresh_ui_fn = None
+_cleanup_ui_fn = None
 
-def init_player(bot, config, radio, update_fn, refresh_fn):
-    global _bot_ref, _config_ref, _radio_ref, _update_now_playing_fn, _refresh_ui_fn
+def init_player(bot, config, radio, update_fn, refresh_fn, cleanup_fn=None):
+    global _bot_ref, _config_ref, _radio_ref, _update_now_playing_fn, _refresh_ui_fn, _cleanup_ui_fn
     _bot_ref = bot
     _config_ref = config
     _radio_ref = radio
     _update_now_playing_fn = update_fn
     _refresh_ui_fn = refresh_fn
+    _cleanup_ui_fn = cleanup_fn
+
+async def resolve_external_song(url):
+    try:
+        import os
+        import json
+        
+        ytdlp_path = "yt-dlp"
+        if _config_ref and _config_ref.ffmpeg_path:
+            if os.path.sep in _config_ref.ffmpeg_path:
+                potential = _config_ref.ffmpeg_path.replace("ffmpeg.exe", "yt-dlp.exe").replace("ffmpeg", "yt-dlp")
+                if os.path.exists(potential):
+                    ytdlp_path = potential
+
+        cmd = [
+            ytdlp_path, 
+            "-j", 
+            "-f", "bestaudio/best",
+            "--no-playlist", 
+            "--flat-playlist", 
+            url
+        ]
+             
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode != 0:
+            err_msg = stderr.decode(errors="ignore").strip()
+            print(f"[YT-DLP] Error probing {url} (code {process.returncode}): {err_msg}")
+            return None
+            
+        info = json.loads(stdout.decode())
+        
+        stream_url = info.get("url")
+        if not stream_url and "formats" in info:
+            formats = info["formats"]
+            audio_formats = [f for f in formats if f.get("vcodec") == "none"]
+            if audio_formats:
+                stream_url = audio_formats[-1].get("url")
+            else:
+                stream_url = formats[-1].get("url")
+        
+        if not stream_url:
+            print(f"[YT-DLP] No stream URL found in metadata for {url}")
+            return None
+            
+        return {
+            "title": info.get("title", "Unknown Title"),
+            "artist": info.get("uploader", info.get("artist", "Unknown Artist")),
+            "album": info.get("extractor_key", "Web Stream"),
+            "duration": int(info.get("duration", 0)),
+            "stream_url": stream_url,
+            "thumbnail_url": info.get("thumbnail"),
+            "is_external": True,
+            "is_resolving": False,
+            "webpage_url": info.get("webpage_url")
+        }
+    except Exception as e:
+        import traceback
+        print(f"[YT-DLP] Exception resolving {url}: {e}")
+        traceback.print_exc()
+        return None
+
+async def add_external_link_to_queue(url):
+    if _radio_ref.is_auto_mode:
+        _radio_ref.queue = []
+        _radio_ref.is_auto_mode = False
+    
+    title_placeholder = url.split('?')[0].split('/')[-1] or url
+    song = {
+        "id": 0,
+        "title": title_placeholder, 
+        "artist": "...",
+        "album": "...",
+        "genre": "WEB",
+        "path": url,
+        "is_external": True,
+        "is_resolving": True,
+        "duration": 0,
+        "thumbnail_url": None
+    }
+    _radio_ref.queue.append(song)
+    await _refresh_ui_fn()
+    
+    # Resolve metadata async
+    ext = await resolve_external_song(url)
+    if ext:
+        song.update(ext)
+        song["is_resolving"] = False
+        await _refresh_ui_fn()
+    else:
+        # If it fails, keep the placeholder but mark as failed
+        song["title"] = f"{Icons.WARNING} {title_placeholder}"
+        song["is_resolving"] = False
+        await _refresh_ui_fn()
+
 async def ensure_voice():
     guild = _bot_ref.get_guild(_config_ref.guild_id)
     if not guild:
@@ -55,6 +157,9 @@ async def radio_player():
                         _radio_ref.queue = []
                         _radio_ref.is_auto_mode = False
                     _radio_ref.queue.append(data)
+                    await _refresh_ui_fn()
+                elif action == RadioAction.ADD_EXT_LINK:
+                    asyncio.create_task(add_external_link_to_queue(data))
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
                     await _refresh_ui_fn()
@@ -99,6 +204,9 @@ async def radio_player():
                         _radio_ref.is_auto_mode = False
                     _radio_ref.queue.append(data)
                     _radio_ref.is_seeking = False
+                    await _refresh_ui_fn()
+                elif action == RadioAction.ADD_EXT_LINK:
+                    asyncio.create_task(add_external_link_to_queue(data))
                 else:
                     continue
                 _radio_ref.status = RadioStatusEnum.PLAYING
@@ -136,9 +244,12 @@ async def radio_player():
                         _radio_ref.queue = []
                         _radio_ref.is_auto_mode = False
                     _radio_ref.queue.append(data)
+                    await _refresh_ui_fn()
                 elif action == RadioAction.REMOVE_FROM_QUEUE:
                     if data in _radio_ref.queue:
                         _radio_ref.queue.remove(data)
+                elif action == RadioAction.ADD_EXT_LINK:
+                    asyncio.create_task(add_external_link_to_queue(data))
                 elif action == RadioAction.CLEAR_QUEUE:
                     _radio_ref.queue = []
                     await _refresh_ui_fn()
@@ -173,17 +284,36 @@ async def radio_player():
                 continue
             _radio_ref.status = RadioStatusEnum.PLAYING
             print("Playing:", song)
+            
+            source_path = song["path"]
+            if song.get("is_external"):
+                if not song.get("stream_url") or song.get("is_resolving"):
+                    if not song.get("title") or song.get("title") == source_path:
+                        song["title"] = t("weblink_processing")
+                    await _update_now_playing_fn(song)
+
+                    ext = await resolve_external_song(source_path)
+                    if ext:
+                        song.update(ext)
+                
+                if song.get("stream_url"):
+                    source_path = song["stream_url"]
+                else:
+                    print(f"[PLAYER] Failed to resolve external link: {source_path}")
+                    _radio_ref.current_song = None
+                    continue
+
             before_opts = "-nostdin -re"
             if _radio_ref.seek_position is not None:
                 before_opts += f" -ss {_radio_ref.seek_position}"
             filters = []
-            if _config_ref.use_loudnorm:
+            if not song.get("is_external") and _config_ref.use_loudnorm:
                 filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
             filters.append(f"volume={_radio_ref.volume}")
             filter_chain = ",".join(filters)
             
             raw_source = discord.FFmpegOpusAudio(
-                song["path"],
+                source_path,
                 executable=_config_ref.ffmpeg_path,
                 before_options=before_opts,
                 options=f'-vn -filter:a "{filter_chain}"'
@@ -209,7 +339,7 @@ async def radio_player():
             start_time = asyncio.get_event_loop().time()
             history_saved = False
             while not done.is_set():
-                if not history_saved and (asyncio.get_event_loop().time() - start_time >= _config_ref.history_save_seconds):
+                if not history_saved and not song.get("is_external") and (asyncio.get_event_loop().time() - start_time >= _config_ref.history_save_seconds):
                     user_id = _radio_ref.last_user.id if _radio_ref.last_user else None
                     await _radio_ref.db.add_to_history(song["path"], user_id)
                     history_saved = True
@@ -293,7 +423,10 @@ async def radio_player():
                                 await guild.voice_client.disconnect()
                             _radio_ref.voice = None
                             _radio_ref.current_song = None
-                            await _update_now_playing_fn({})
+                            if _cleanup_ui_fn:
+                                await _cleanup_ui_fn()
+                            else:
+                                await _update_now_playing_fn({})
                             break
                         elif action == RadioAction.SET_GENRE:
                             _radio_ref.genre = data
@@ -307,6 +440,8 @@ async def radio_player():
                                 _radio_ref.is_auto_mode = False
                             _radio_ref.queue.append(data)
                             await _update_now_playing_fn(song)
+                        elif action == RadioAction.ADD_EXT_LINK:
+                            asyncio.create_task(add_external_link_to_queue(data))
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)
@@ -343,7 +478,7 @@ async def radio_player():
                 except asyncio.TimeoutError:
                     continue
             elapsed_time = asyncio.get_event_loop().time() - start_time
-            if elapsed_time >= ten_percent_duration:
+            if not song.get("is_external") and elapsed_time >= ten_percent_duration:
                 await _radio_ref.db.update_last_played(song["path"])
                 print(f"Play count updated for: {song['path']}")
             _radio_ref.track_start_time = None

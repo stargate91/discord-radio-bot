@@ -22,6 +22,8 @@ def init_ui(_bot, _config, _radio):
     Theme.init_theme(config)
     init_player_ui(bot, config, update_now_playing)
 async def update_now_playing(song: dict):
+    if not bot or bot.is_closed():
+        return
     try:
         if radio.status == RadioStatusEnum.PLAYING and song:
             artist = song.get("artist", "Unknown")

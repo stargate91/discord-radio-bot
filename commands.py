@@ -12,6 +12,19 @@ def setup_commands(tree, radio):
         if not interaction.user.voice:
             await interaction.response.send_message("You are not in a voice channel!", ephemeral=True)
             return
+            
+        await interaction.response.defer(ephemeral=True)
+        
+        # Check if it's a link
+        query_strip = query.strip()
+        if query_strip.startswith("http://") or query_strip.startswith("https://"):
+            if radio.voice_channel_id is None:
+                radio.dispatch(RadioAction.JOIN, interaction.user.voice.channel.id, user=interaction.user)
+            radio.dispatch(RadioAction.ADD_EXT_LINK, query_strip, user=interaction.user)
+            try: await interaction.delete_original_response()
+            except: pass
+            return
+
         song = await db.get_song_by_id(int(query)) if query.isdigit() else None
         if not song:
             song = await db.get_song_by_path(query)
@@ -20,9 +33,9 @@ def setup_commands(tree, radio):
             if results:
                 song = results[0]
         if not song:
-            await interaction.response.send_message(f"No results found for: `{query}`", ephemeral=True)
+            await interaction.followup.send(f"No results found for: `{query}`", ephemeral=True)
             return
-        await interaction.response.defer(ephemeral=True)
+            
         if radio.voice_channel_id is None:
             radio.dispatch(RadioAction.JOIN, interaction.user.voice.channel.id, user=interaction.user)
         radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
