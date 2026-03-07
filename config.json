@@ -33,6 +33,7 @@
     },
     "defaults": {
         "volume": 0.5,
+        "use_loudnorm": false,
         "autocomplete_limit": 25
     },
     "languages": [
@@ -92,6 +93,7 @@
         "timings.history_save_seconds": "Secs after which a track is added to personal history.",
         "timings.play_count_threshold_percent": "Percent (0.1 = 10%) played to count as 1 view.",
         "defaults.volume": "Initial volume for the player (0.0 to 1.0).",
+        "defaults.use_loudnorm": "Use ffmpeg 'loudnorm' filter to equalize volume levels across songs.",
         "defaults.autocomplete_limit": "Max results shown in slash command search."
     }
 }

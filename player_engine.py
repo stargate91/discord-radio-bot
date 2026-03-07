@@ -176,12 +176,17 @@ async def radio_player():
             before_opts = "-nostdin -re"
             if _radio_ref.seek_position is not None:
                 before_opts += f" -ss {_radio_ref.seek_position}"
-            volume_filter = f"-filter:a volume={_radio_ref.volume}"
+            filters = []
+            if _config_ref.use_loudnorm:
+                filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+            filters.append(f"volume={_radio_ref.volume}")
+            filter_chain = ",".join(filters)
+            
             raw_source = discord.FFmpegOpusAudio(
                 song["path"],
                 executable=_config_ref.ffmpeg_path,
                 before_options=before_opts,
-                options=f"-vn {volume_filter}"
+                options=f'-vn -filter:a "{filter_chain}"'
             )
             _radio_ref.track_start_time = asyncio.get_event_loop().time()
             _radio_ref.track_start_offset = _radio_ref.seek_position or 0.0

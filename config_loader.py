@@ -66,6 +66,7 @@ class Config:
         
         defaults = data.get("defaults", {})
         self.default_volume = float(defaults.get("volume", 0.5))
+        self.use_loudnorm = bool(defaults.get("use_loudnorm", True))
         self.autocomplete_limit = int(defaults.get("autocomplete_limit", 25))
         
         self.languages = data.get("languages", [
