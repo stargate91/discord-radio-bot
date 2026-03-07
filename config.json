@@ -1,13 +1,13 @@
 {
-    "guild_id": "YOUR_GUILD_ID",
-    "voice_channel_id": "YOUR_VOICE_CHANNEL_ID",
+    "guild_id": 0,
+    "voice_channel_id": 0,
+    "radio_text_channel_id": 0,
     "auto_join_channel_id": 0,
-    "radio_text_channel_id": "YOUR_RADIO_TEXT_CHANNEL_ID",
-    "feedback_channel_id": "1424674399205851250",
-    "afk_channel_id": "YOUR_AFK_CHANNEL_ID",
+    "feedback_channel_id": 0,
+    "afk_channel_id": 0,
+    "admin_role_id": 0,
+    "sysadmin_role_id": 0,
     "default_genre": "Electronic",
-    "cleanup_interval_days": 14,
-    "scan_interval_days": 14,
     "default_language": "en",
     "default_ui_mode": "full",
     "default_presence": "Waiting for signal...",
@@ -16,13 +16,11 @@
         "flac",
         "wav"
     ],
-    "admin_role_id": 0,
-    "sysadmin_role_id": 0,
-    "restricted_channels": {
-        "CHANNEL_ID": "ROLE_ID"
-    },
+    "cleanup_interval_days": 14,
+    "scan_interval_days": 1,
     "ffmpeg_path": "ffmpeg",
     "db_path": "data/radio.db",
+    "restricted_channels": {},
     "timings": {
         "embed_refresh_minutes": 58,
         "progress_update_seconds": 15,
@@ -53,7 +51,6 @@
         "playlist_items_per_page": 5,
         "queue_refresh_limit": 11,
         "player_upcoming_limit": 5,
-        "levifav_min_rating": 5,
         "theme": {
             "primary": "0x5865F2",
             "secondary": "0x2b2d31",
@@ -67,17 +64,6 @@
             "accent": "0x5865F2"
         }
     },
-    "genres": {
-        "Electronic": [
-            "C:/Music/Electronic/Labels",
-            "C:/Music/Electronic/Releases"
-        ],
-        "Rock": [
-            "C:/Music/Rock"
-        ],
-        "Chillout": [
-            "C:/Music/Ambient",
-            "C:/Music/Chillout"
-        ]
-    }
+    "genres": {},
+    "virtual_genres": []
 }

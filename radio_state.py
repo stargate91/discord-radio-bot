@@ -77,9 +77,20 @@ class RadioState:
             self.last_user = user
         self.action_queue.put_nowait((action, data))
     async def get_random_song_by_genre(self, genre: str):
-        if genre.lower() == "levifav":
-            return await self.db.get_random_song_by_rating(min_rating=self.config.levifav_min_rating)
+        # Check for virtual genres first
+        for vg in self.config.virtual_genres:
+            if vg["name"].lower() == genre.lower():
+                return await self.db.get_random_song_by_rating(min_rating=vg.get("min_rating", 5))
+        
+        # Fallback to standard database genre lookup
         return await self.db.get_random_song_by_genre(genre)
+
+    async def get_all_genres(self):
+        db_genres = await self.db.get_all_genres()
+        virtual_names = [vg["name"] for vg in self.config.virtual_genres]
+        # Return merged list, ensuring no duplicates and sorting
+        all_genres = list(set(db_genres + virtual_names))
+        return sorted(all_genres, key=lambda s: s.lower())
 
     def get_display_queue(self):
         return list(reversed(self.forward_stack)) + self.queue

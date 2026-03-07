@@ -62,7 +62,7 @@ async def main():
     async def on_ready():
         print(f"Online as: {bot.user}")
         try:
-            genres = await db.get_all_genres()
+            genres = await radio.get_all_genres()
             bot.add_view(UnifiedStandbyView(radio))
             bot.add_view(FrequencyStationView(radio))
             bot.add_view(NowPlayingView(radio, genres=genres))

@@ -99,7 +99,7 @@ async def update_now_playing(song: dict):
             valid_file = True
         except:
             file = None
-    genres = await radio.db.get_all_genres()
+    genres = await radio.get_all_genres()
 
     is_fav = False
     if song and radio.last_user:

@@ -124,8 +124,6 @@ class GenreSelect(discord.ui.Select):
     def __init__(self, radio, genres):
         self.radio = radio
         self.db = radio.db
-        if "levifav" not in genres:
-            genres.insert(0, "levifav")
         limited_genres = genres[:25]
         if len(genres) > 25:
             print(f"[UI] Warning: Too many genres ({len(genres)}), capping to 25 for select menu.")
