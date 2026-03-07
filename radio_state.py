@@ -65,6 +65,7 @@ class RadioState:
         self.track_start_offset: float = 0.0
         self.track_duration: int = 0
         self.afk_task: asyncio.Task | None = None
+        self.is_auto_mode: bool = True
     async def refresh_queue(self):
         self.queue = []
         for _ in range(self.config.queue_refresh_limit):

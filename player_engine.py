@@ -16,9 +16,17 @@ def init_player(bot, config, radio, update_fn, refresh_fn):
     _update_now_playing_fn = update_fn
     _refresh_ui_fn = refresh_fn
 async def ensure_voice():
+    guild = _bot_ref.get_guild(_config_ref.guild_id)
+    if not guild:
+        return None
+
+    if not _radio_ref.voice_channel_id and guild.voice_client:
+        _radio_ref.voice_channel_id = guild.voice_client.channel.id
+        _radio_ref.embed_manager.save_value("voice_channel_id", _radio_ref.voice_channel_id)
+
     if not _radio_ref.voice_channel_id:
         return None
-    guild = _bot_ref.get_guild(_config_ref.guild_id)
+        
     channel = guild.get_channel(_radio_ref.voice_channel_id)
     if not channel:
         print("Voice channel not found")
@@ -43,14 +51,10 @@ async def radio_player():
                     _radio_ref.status = RadioStatusEnum.PLAYING
                     await _update_now_playing_fn(_radio_ref.current_song or {})
                 elif action == RadioAction.ADD_TO_QUEUE:
-                    # If someone wants to play a song but bot isn't in a channel, try to join them
-                    user = _radio_ref.last_user
-                    if user and hasattr(user, 'voice') and user.voice:
-                        _radio_ref.voice_channel_id = user.voice.channel.id
-                        _radio_ref.embed_manager.save_value("voice_channel_id", user.voice.channel.id)
-                        _radio_ref.queue.insert(0, data)
-                        _radio_ref.status = RadioStatusEnum.PLAYING
-                        print(f"[SYSTEM] Auto-joining {user.display_name} in {user.voice.channel.name} to play requested song.")
+                    if _radio_ref.is_auto_mode:
+                        _radio_ref.queue = []
+                        _radio_ref.is_auto_mode = False
+                    _radio_ref.queue.append(data)
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
                     await _refresh_ui_fn()
@@ -90,7 +94,10 @@ async def radio_player():
                     await _refresh_ui_fn()
                     continue
                 elif action == RadioAction.ADD_TO_QUEUE:
-                    _radio_ref.queue.insert(0, data)
+                    if _radio_ref.is_auto_mode:
+                        _radio_ref.queue = []
+                        _radio_ref.is_auto_mode = False
+                    _radio_ref.queue.append(data)
                     _radio_ref.is_seeking = False
                 else:
                     continue
@@ -125,7 +132,10 @@ async def radio_player():
                     await _refresh_ui_fn()
                     print(f"[ACTION HANDLED] SET_LANGUAGE: Language set to {data}")
                 elif action == RadioAction.ADD_TO_QUEUE:
-                    _radio_ref.queue.insert(0, data)
+                    if _radio_ref.is_auto_mode:
+                        _radio_ref.queue = []
+                        _radio_ref.is_auto_mode = False
+                    _radio_ref.queue.append(data)
                 elif action == RadioAction.REMOVE_FROM_QUEUE:
                     if data in _radio_ref.queue:
                         _radio_ref.queue.remove(data)
@@ -137,18 +147,21 @@ async def radio_player():
             if _radio_ref.is_seeking and _radio_ref.current_song:
                 song = _radio_ref.current_song
             else:
+                if not _radio_ref.queue and not _radio_ref.is_auto_mode:
+                    _radio_ref.is_auto_mode = True
                 if not _radio_ref.queue:
                     await _radio_ref.refresh_queue()
                 if _radio_ref.queue:
                     song = _radio_ref.queue.pop(0)
+                    if _radio_ref.is_auto_mode:
+                        new_song = await _radio_ref.get_random_song_by_genre(_radio_ref.genre)
+                        if new_song:
+                            _radio_ref.queue.append(new_song)
                     if not _radio_ref.is_back_action and not _radio_ref.is_forward_action:
                         _radio_ref.last_history_paths = []
                         _radio_ref.forward_stack = []
                     _radio_ref.is_back_action = False
                     _radio_ref.is_forward_action = False
-                    new_song = await _radio_ref.get_random_song_by_genre(_radio_ref.genre)
-                    if new_song:
-                        _radio_ref.queue.append(new_song)
                 else:
                     song = None
                 _radio_ref.current_song = song
@@ -274,7 +287,6 @@ async def radio_player():
                             if guild and guild.voice_client:
                                 await guild.voice_client.disconnect()
                             _radio_ref.voice = None
-                            # Clear current song to force standby UI
                             _radio_ref.current_song = None
                             await _update_now_playing_fn({})
                             break
@@ -285,11 +297,11 @@ async def radio_player():
                             voice.stop()
                             break
                         elif action == RadioAction.ADD_TO_QUEUE:
-                            _radio_ref.queue.insert(0, data)
-                            _radio_ref.is_seeking = False
-                            voice.stop()
-                            print(f"[PROCESS] ADD_TO_QUEUE: Instant switch to {data.get('title')}")
-                            break
+                            if _radio_ref.is_auto_mode:
+                                _radio_ref.queue = []
+                                _radio_ref.is_auto_mode = False
+                            _radio_ref.queue.append(data)
+                            await _update_now_playing_fn(song)
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)
@@ -313,9 +325,6 @@ async def radio_player():
                         elif action == RadioAction.SHUFFLE:
                             import random
                             random.shuffle(_radio_ref.queue)
-                            await _update_now_playing_fn(song)
-                        elif action == RadioAction.ADD_TO_QUEUE:
-                            _radio_ref.queue.append(data)
                             await _update_now_playing_fn(song)
                         elif action == RadioAction.REMOVE_FROM_QUEUE:
                             if data in _radio_ref.queue:

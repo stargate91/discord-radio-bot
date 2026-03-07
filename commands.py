@@ -23,11 +23,10 @@ def setup_commands(tree, radio):
             await interaction.response.send_message(f"No results found for: `{query}`", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
-        if not radio.voice:
+        if radio.voice_channel_id is None:
             radio.dispatch(RadioAction.JOIN, interaction.user.voice.channel.id, user=interaction.user)
         radio.dispatch(RadioAction.ADD_TO_QUEUE, song, user=interaction.user)
-        radio.dispatch(RadioAction.SKIP, user=interaction.user)
-        await interaction.followup.send(f"Broadcasting: **{song['artist']} - {song['title']}**", ephemeral=True)
+        await interaction.followup.send(f"Added to queue: **{song['artist']} - {song['title']}**", ephemeral=True)
 
     @tree.command(name="stats", description="Show playback statistics")
     async def stats(interaction: discord.Interaction):
