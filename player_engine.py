@@ -84,7 +84,21 @@ async def resolve_external_song(url):
         traceback.print_exc()
         return None
 
-async def add_external_link_to_queue(url):
+async def resolve_external_link_task(song):
+    # Resolve metadata async
+    ext = await resolve_external_song(song["path"])
+    if ext:
+        song.update(ext)
+        song["is_resolving"] = False
+        await _refresh_ui_fn()
+    else:
+        # If it fails, keep the placeholder but mark as failed
+        title_placeholder = song["path"].split('?')[0].split('/')[-1] or song["path"]
+        song["title"] = f"{Icons.WARNING} {title_placeholder}"
+        song["is_resolving"] = False
+        await _refresh_ui_fn()
+
+def add_external_link_to_queue(url):
     if _radio_ref.is_auto_mode:
         _radio_ref.queue = []
         _radio_ref.is_auto_mode = False
@@ -103,19 +117,8 @@ async def add_external_link_to_queue(url):
         "thumbnail_url": None
     }
     _radio_ref.queue.append(song)
-    await _refresh_ui_fn()
-    
-    # Resolve metadata async
-    ext = await resolve_external_song(url)
-    if ext:
-        song.update(ext)
-        song["is_resolving"] = False
-        await _refresh_ui_fn()
-    else:
-        # If it fails, keep the placeholder but mark as failed
-        song["title"] = f"{Icons.WARNING} {title_placeholder}"
-        song["is_resolving"] = False
-        await _refresh_ui_fn()
+    asyncio.create_task(resolve_external_link_task(song))
+    return song
 
 async def ensure_voice():
     guild = _bot_ref.get_guild(_config_ref.guild_id)
@@ -159,14 +162,15 @@ async def radio_player():
                     _radio_ref.queue.append(data)
                     await _refresh_ui_fn()
                 elif action == RadioAction.ADD_EXT_LINK:
-                    asyncio.create_task(add_external_link_to_queue(data))
+                    add_external_link_to_queue(data)
+                    await _refresh_ui_fn()
                 elif action == RadioAction.SET_LANGUAGE:
                     _radio_ref.language = data
                     await _refresh_ui_fn()
                     print(f"DEBUG: Language changed to: {data}")
                 continue
-            if _radio_ref.status == RadioStatusEnum.IDLE:
-                print("[RADIO] Idle, waiting for action...")
+            if _radio_ref.status in [RadioStatusEnum.IDLE, RadioStatusEnum.STOPPED]:
+                print(f"[RADIO] {_radio_ref.status.name}, waiting for action...")
                 action, data = await _radio_ref.action_queue.get()
                 if action == RadioAction.SET_GENRE:
                     _radio_ref.genre = data
@@ -209,7 +213,8 @@ async def radio_player():
                     _radio_ref.is_seeking = False
                     await _refresh_ui_fn()
                 elif action == RadioAction.ADD_EXT_LINK:
-                    asyncio.create_task(add_external_link_to_queue(data))
+                    add_external_link_to_queue(data)
+                    await _refresh_ui_fn()
                 else:
                     continue
                 _radio_ref.status = RadioStatusEnum.PLAYING
@@ -224,7 +229,7 @@ async def radio_player():
                 elif action == RadioAction.SKIP:
                     _radio_ref.is_seeking = False
                 elif action == RadioAction.STOP:
-                    _radio_ref.status = RadioStatusEnum.IDLE
+                    _radio_ref.status = RadioStatusEnum.STOPPED
                     await _radio_ref.refresh_queue()
                 elif action == RadioAction.JOIN:
                     _radio_ref.voice_channel_id = data
@@ -257,18 +262,20 @@ async def radio_player():
                     if data in _radio_ref.queue:
                         _radio_ref.queue.remove(data)
                 elif action == RadioAction.ADD_EXT_LINK:
-                    asyncio.create_task(add_external_link_to_queue(data))
+                    add_external_link_to_queue(data)
+                    await _refresh_ui_fn()
                 elif action == RadioAction.CLEAR_QUEUE:
                     _radio_ref.queue = []
                     await _refresh_ui_fn()
-            if _radio_ref.status == RadioStatusEnum.IDLE:
+            if _radio_ref.status in [RadioStatusEnum.IDLE, RadioStatusEnum.STOPPED]:
                 continue
             if _radio_ref.is_seeking and _radio_ref.current_song:
                 song = _radio_ref.current_song
             else:
                 if not _radio_ref.queue and not _radio_ref.is_auto_mode:
-                    _radio_ref.is_auto_mode = True
-                if not _radio_ref.queue:
+                    if not _radio_ref.is_fallback_mode:
+                        _radio_ref.is_auto_mode = True
+                if not _radio_ref.queue and _radio_ref.is_auto_mode:
                     await _radio_ref.refresh_queue()
                 if _radio_ref.queue:
                     song = _radio_ref.queue.pop(0)
@@ -281,6 +288,12 @@ async def radio_player():
                         _radio_ref.forward_stack = []
                     _radio_ref.is_back_action = False
                     _radio_ref.is_forward_action = False
+                elif _radio_ref.is_fallback_mode:
+                    song = None
+                    _radio_ref.status = RadioStatusEnum.IDLE
+                    _radio_ref.current_song = None
+                    await _update_now_playing_fn({})
+                    continue
                 else:
                     song = None
                 _radio_ref.current_song = song
@@ -405,7 +418,7 @@ async def radio_player():
                             _radio_ref.seek_position = 0
                             _radio_ref.track_start_time = None
                             _radio_ref.track_start_offset = 0.0
-                            _radio_ref.status = RadioStatusEnum.IDLE
+                            _radio_ref.status = RadioStatusEnum.STOPPED
                             voice.stop()
                             await _update_now_playing_fn(song)
                             break
@@ -449,7 +462,8 @@ async def radio_player():
                             _radio_ref.queue.append(data)
                             await _update_now_playing_fn(song)
                         elif action == RadioAction.ADD_EXT_LINK:
-                            asyncio.create_task(add_external_link_to_queue(data))
+                            add_external_link_to_queue(data)
+                            await _update_now_playing_fn(song)
                         elif action == RadioAction.BACK:
                             if _radio_ref.current_song:
                                 _radio_ref.forward_stack.append(_radio_ref.current_song)

@@ -144,10 +144,37 @@ class GenreSelect(discord.ui.Select):
         self.radio.dispatch(RadioAction.SET_GENRE, selected, user=interaction.user)
         await interaction.response.defer()
 
+class FallbackModeButton(discord.ui.Button):
+
+    def __init__(self, radio):
+        label = t("online_mode_off") if not radio.is_fallback_mode else t("online_mode_on")
+        style = discord.ButtonStyle.secondary if not radio.is_fallback_mode else discord.ButtonStyle.primary
+        super().__init__(
+            label=label,
+            emoji=Icons.GLOBE,
+            style=style,
+            custom_id="toggle_fallback_mode"
+        )
+        self.radio = radio
+
+    @handle_ui_error
+    async def callback(self, interaction: discord.Interaction):
+        self.radio.is_fallback_mode = not self.radio.is_fallback_mode
+        self.radio.is_auto_mode = not self.radio.is_fallback_mode
+        if self.radio.is_fallback_mode:
+            self.radio.status = RadioStatusEnum.IDLE
+            self.radio.queue = []
+            self.radio.current_song = None
+        
+        await interaction.response.defer(ephemeral=True)
+        try: await interaction.delete_original_response()
+        except: pass
+        if _update_callback: await _update_callback(self.radio.current_song or {})
+
 class PlayPauseButton(discord.ui.Button):
 
     def __init__(self, radio):
-        is_paused = radio.status == RadioStatusEnum.PAUSED or radio.status == RadioStatusEnum.IDLE
+        is_paused = radio.status in [RadioStatusEnum.PAUSED, RadioStatusEnum.STOPPED, RadioStatusEnum.IDLE]
         label = None if radio.is_compact else (t('play_label') if is_paused else t('pause_label'))
         emoji = Icons.PLAY if is_paused else Icons.PAUSE
         super().__init__(
@@ -160,7 +187,7 @@ class PlayPauseButton(discord.ui.Button):
 
     @handle_ui_error
     async def callback(self, interaction: discord.Interaction):
-        if self.radio.status == RadioStatusEnum.PAUSED or self.radio.status == RadioStatusEnum.IDLE:
+        if self.radio.status in [RadioStatusEnum.PAUSED, RadioStatusEnum.STOPPED, RadioStatusEnum.IDLE]:
             self.radio.dispatch(RadioAction.REPLAY, user=interaction.user)
         else:
             self.radio.dispatch(RadioAction.PAUSE, user=interaction.user)
@@ -521,15 +548,18 @@ class UnifiedStandbyView(BaseView):
             from ui_feedback import FeedbackButton
             
             row_main = ActionRow()
-            row_main.add_item(PlaylistStudioButton(radio))
+            if not radio.is_fallback_mode:
+                row_main.add_item(PlaylistStudioButton(radio))
             row_main.add_item(FeedbackButton(radio))
+            row_main.add_item(FallbackModeButton(radio))
             station_container.add_item(row_main)
             
-            row_admin = ActionRow()
-            row_admin.add_item(RescanLibraryButton(radio))
-            row_admin.add_item(AddGenreButton(radio))
-            row_admin.add_item(PathUpdateButton(radio))
-            station_container.add_item(row_admin)
+            if not radio.is_fallback_mode:
+                row_admin = ActionRow()
+                row_admin.add_item(RescanLibraryButton(radio))
+                row_admin.add_item(AddGenreButton(radio))
+                row_admin.add_item(PathUpdateButton(radio))
+                station_container.add_item(row_admin)
         self.add_item(station_container)
         standby_container = Container(accent_color=Theme.BACKGROUND)
         standby_container.add_item(TextDisplay(f"**{t('standby_mode')}**\n{t('standby_subtitle')}"))
@@ -560,7 +590,8 @@ class FrequencyStationView(BaseView):
             from ui_studio import PlaylistStudioButton
             from ui_search import WebLinkButton
             row_meta.add_item(DisconnectButton(radio))
-            row_meta.add_item(PlaylistStudioButton(radio))
+            if not radio.is_fallback_mode:
+                row_meta.add_item(PlaylistStudioButton(radio))
             row_meta.add_item(FeedbackButton(radio))
             station_container.add_item(row_meta)
         self.add_item(station_container)
@@ -580,10 +611,14 @@ class NowPlayingView(BaseView):
             status_key = "paused"
             status_emoji = Icons.PAUSE
             accent_color = Theme.PAUSED
-        elif radio.status == RadioStatusEnum.IDLE:
-            status_key = "idle"
+        elif radio.status == RadioStatusEnum.STOPPED:
+            status_key = "stopped"
             status_emoji = Icons.STOP
             accent_color = Theme.IDLE
+        elif radio.status == RadioStatusEnum.IDLE:
+            status_key = "idle"
+            status_emoji = Icons.STANDBY # Use standby icon for pure idle if ever shown
+            accent_color = Theme.BACKGROUND
         
         if cover_path:
             dominant = get_dominant_color(cover_path)
@@ -607,10 +642,16 @@ class NowPlayingView(BaseView):
         elapsed = min(elapsed, duration)
         
         status_title = f"{status_emoji} {t(status_key).upper()}"
-        truncated_artist = fixed(song.get('artist', 'Unknown'), 32).strip()
-        truncated_title = fixed(song.get('title', 'Unknown'), 32).strip()
-        truncated_album = fixed(song.get('album', 'Unknown'), 32).strip()
-        is_external = song.get('is_external', False)
+        if radio.is_fallback_mode and not song:
+            status_title = t("online_mode_title")
+            truncated_artist = "---"
+            truncated_title = t("online_mode_subtitle")
+            truncated_album = "OFFLINE"
+        else:
+            truncated_artist = fixed(song.get('artist', 'Unknown'), 32).strip()
+            truncated_title = fixed(song.get('title', 'Unknown'), 32).strip()
+            truncated_album = fixed(song.get('album', 'Unknown'), 32).strip()
+        is_external = song.get('is_external', False) or radio.is_fallback_mode
 
         def create_progress_bar(current, total, width=18):
             if total <= 0:
@@ -644,14 +685,17 @@ class NowPlayingView(BaseView):
             f"**{t('album') if not is_external else t('platform')}:** {truncated_album}"
         ]
         
-        if not is_external:
+        if not is_external and not radio.is_fallback_mode:
             info_lines.append(f"**{t('genre')}:** {song.get('genre', 'Unknown').upper()}")
             info_lines.append(f"**{t('likes')}:** {song.get('likes', 0)} | **{t('dislikes')}:** {song.get('dislikes', 0)}")
+        elif radio.is_fallback_mode and not song:
+            pass # Skip extra info lines in empty online mode
             
-        info_lines.extend([
-            f"\n{time_readout}\n",
-            f"{progress_bar}"
-        ])
+        if song or not radio.is_fallback_mode:
+            info_lines.extend([
+                f"\n{time_readout}\n",
+                f"{progress_bar}"
+            ])
         if radio.show_details:
             info_lines.append(f"\n**{Icons.INFO} {t('details_label')}**")
             info_lines.append(f"**{t('year')}:** {song.get('date', 'Unknown')}")
@@ -683,10 +727,11 @@ class NowPlayingView(BaseView):
             master_container.add_item(Section(info_text, accessory=thumb))
         else:
             master_container.add_item(TextDisplay(info_text))
-        master_container.add_item(Separator())
-        genre_row = ActionRow()
-        genre_row.add_item(GenreSelect(radio, genres))
-        master_container.add_item(genre_row)
+        if not radio.is_fallback_mode:
+            master_container.add_item(Separator())
+            genre_row = ActionRow()
+            genre_row.add_item(GenreSelect(radio, genres))
+            master_container.add_item(genre_row)
         master_container.add_item(Separator())
         
         from ui_search import LibraryButton, SearchButton, QueueViewButton, WebLinkButton
@@ -694,9 +739,16 @@ class NowPlayingView(BaseView):
         
         all_buttons = [
             BackButton(radio), PlayPauseButton(radio), StopButton(radio),
-            ForwardButton(radio), RandomButton(radio),
-            ShuffleButton(radio), SeekButton(radio), VolumeButton(radio)
+            ForwardButton(radio)
         ]
+        
+        if not radio.is_fallback_mode:
+            all_buttons.append(RandomButton(radio))
+            all_buttons.append(ShuffleButton(radio))
+            
+        all_buttons.extend([
+            SeekButton(radio), VolumeButton(radio)
+        ])
         
         if not is_external:
             all_buttons.append(DetailsButton(radio))
@@ -709,11 +761,15 @@ class NowPlayingView(BaseView):
                 FavoriteButton(radio, is_favorited=self.is_favorited)
             ])
             
-        all_buttons.extend([
-            LibraryButton(radio), SearchButton(radio),
-            QueueViewButton(radio), WebLinkButton(radio),
-            StatsButton(radio), HistoryButton(radio)
-        ])
+        if not radio.is_fallback_mode:
+            all_buttons.extend([
+                LibraryButton(radio), SearchButton(radio),
+                QueueViewButton(radio), WebLinkButton(radio),
+                StatsButton(radio), HistoryButton(radio)
+            ])
+        else:
+            all_buttons.append(WebLinkButton(radio))
+            all_buttons.append(QueueViewButton(radio))
         
         # 2. Chunk into rows of 5
         for i in range(0, len(all_buttons), 5):

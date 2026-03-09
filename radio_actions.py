@@ -4,6 +4,7 @@ class RadioState(Enum):
     IDLE = auto()
     PLAYING = auto()
     PAUSED = auto()
+    STOPPED = auto()
 
 class RadioAction(Enum):
     SKIP = auto()
@@ -23,3 +24,4 @@ class RadioAction(Enum):
     REMOVE_FROM_QUEUE = auto()
     CLEAR_QUEUE = auto()
     ADD_EXT_LINK = auto()
+    TOGGLE_FALLBACK = auto()

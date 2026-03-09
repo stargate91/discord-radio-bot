@@ -21,7 +21,10 @@ def init_ui(_bot, _config, _radio):
     from ui_theme import Theme
     Theme.init_theme(config)
     init_player_ui(bot, config, update_now_playing)
-async def update_now_playing(song: dict):
+async def update_now_playing(song: dict | None):
+    if song is None:
+        song = {}
+    has_no_song = not song or not song.get("path")
     if not bot or bot.is_closed():
         return
     try:
@@ -37,6 +40,12 @@ async def update_now_playing(song: dict):
             status_text = t("presence_paused")
             activity = discord.Game(name=f"[{status_text}] {artist} - {title}")
             await bot.change_presence(activity=activity)
+        elif radio.status == RadioStatusEnum.STOPPED and song:
+            artist = song.get("artist", "Unknown")
+            title = song.get("title", "Unknown")
+            status_text = t("stopped")
+            activity = discord.Game(name=f"[{status_text}] {artist} - {title}")
+            await bot.change_presence(activity=activity)
         else:
             activity = discord.Game(name=config.default_presence)
             await bot.change_presence(activity=activity)
@@ -49,10 +58,42 @@ async def update_now_playing(song: dict):
         except Exception as e:
             return
 
-    is_idle = radio.status == RadioStatusEnum.IDLE
-    has_no_song = not song or not song.get("path")
+    # Optimization: Only re-render the station message if the core state changed
+    current_station_state = (radio.status, radio.voice_channel_id, radio.language, radio.is_fallback_mode, radio.is_compact)
+    last_station_state = getattr(radio, "_last_station_state", None)
     
-    if not radio.voice_channel_id or has_no_song:
+    needs_station_refresh = (
+        not radio.station_message or 
+        current_station_state != last_station_state
+    )
+
+    # 1. Handle STATION MESSAGE (Standby View vs Frequency Station View)
+    if needs_station_refresh:
+        if not radio.voice_channel_id:
+            # Not in voice -> STANDBY VIEW
+            view = UnifiedStandbyView(radio)
+        else:
+            # In voice -> FREQUENCY STATION VIEW
+            view = FrequencyStationView(radio)
+            
+        if not radio.station_message:
+            msg_id = radio.embed_manager.load_message_id("station")
+            radio.station_message = await safe_fetch_message(channel, msg_id)
+            
+        if radio.station_message:
+            try: await radio.station_message.edit(view=view)
+            except: radio.station_message = await channel.send(view=view)
+        else:
+            radio.station_message = await channel.send(view=view)
+        
+        radio.embed_manager.save_message_id("station", radio.station_message.id)
+        radio._last_station_state = current_station_state
+
+    # 2. Handle PLAYER MESSAGE (Now Playing View)
+    show_player = not has_no_song or (radio.voice_channel_id and radio.is_fallback_mode)
+    
+    if not show_player:
+        # Cleanup player message if it exists
         if not radio.now_playing_message:
             msg_id = radio.embed_manager.load_message_id("player")
             radio.now_playing_message = await safe_fetch_message(channel, msg_id)
@@ -61,33 +102,9 @@ async def update_now_playing(song: dict):
             await safe_delete_message(radio.now_playing_message)
             radio.now_playing_message = None
             radio.embed_manager.save_message_id("player", None)
-        
-        # Always show standby view if idle or no song, even if in voice channel
-        view = UnifiedStandbyView(radio)
-        if not radio.station_message:
-            msg_id = radio.embed_manager.load_message_id("station")
-            radio.station_message = await safe_fetch_message(channel, msg_id)
-        
-        if radio.station_message:
-            try: 
-                await radio.station_message.edit(view=view)
-            except Exception as e: 
-                radio.station_message = await channel.send(view=view)
-        else:
-            radio.station_message = await channel.send(view=view)
-        
-        radio.embed_manager.save_message_id("station", radio.station_message.id)
         return
-    station_view = FrequencyStationView(radio)
-    if not radio.station_message:
-        msg_id = radio.embed_manager.load_message_id("station")
-        radio.station_message = await safe_fetch_message(channel, msg_id)
-    if radio.station_message:
-        try: await radio.station_message.edit(view=station_view)
-        except: radio.station_message = await channel.send(view=station_view)
-    else:
-        radio.station_message = await channel.send(view=station_view)
-    radio.embed_manager.save_message_id("station", radio.station_message.id)
+
+    # If we are here, we show/update the Now Playing view
     file = None
     cover_path = None
     song_path = song.get("path")
@@ -153,6 +170,7 @@ async def force_new_embed():
     
     radio.now_playing_message = None
     radio.station_message = None
+    radio._last_station_state = None
     # No longer global state here, users carry their own editor state
     await update_now_playing(radio.current_song or {})
 async def refresh_all_uis():

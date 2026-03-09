@@ -67,3 +67,4 @@ class Icons:
     PB_RIGHT = discord.PartialEmoji.from_str("<:pbrightempty:1479349706227191828>")
     PB_END = discord.PartialEmoji.from_str("<:pbrightemptyend:1479349707418636451>")
     GLOBE = discord.PartialEmoji.from_str("<:globe:1479722340320542820>")
+    QUEUE_EDIT = discord.PartialEmoji.from_str("<:listordered:1480587112582746153>")

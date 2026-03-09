@@ -305,7 +305,7 @@ class QueueAllButton(discord.ui.Button):
 class QueueViewButton(discord.ui.Button):
 
     def __init__(self, radio):
-        super().__init__(label=None if radio.is_compact else t('edit_queue_label'), emoji=Icons.FULL_LIST, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
+        super().__init__(label=None if radio.is_compact else t('edit_queue_label'), emoji=Icons.QUEUE_EDIT, style=discord.ButtonStyle.secondary, custom_id="full_queue_view")
         self.radio = radio
 
     @handle_ui_error

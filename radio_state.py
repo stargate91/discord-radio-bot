@@ -67,6 +67,7 @@ class RadioState:
         self.track_duration: int = 0
         self.afk_task: asyncio.Task | None = None
         self.is_auto_mode: bool = True
+        self.is_fallback_mode: bool = False
     async def refresh_queue(self):
         self.queue = []
         for _ in range(self.config.queue_refresh_limit):

@@ -8,6 +8,7 @@ LOCALES = {
         "now_playing": "NOW PLAYING",
         "paused": "PAUSED",
         "idle": "IDLE",
+        "stopped": "STOPPED",
         "presence_listening": "Listening to:",
         "presence_paused": "Paused",
         "artist": "Artist",
@@ -187,7 +188,12 @@ LOCALES = {
         "weblink_input_label": "YouTube / SoundCloud URL",
         "weblink_processing": "Processing link, please wait...",
         "weblink_error": "Invalid or unsupported link!",
-        "weblink_added": "Link added to queue!"
+        "weblink_added": "Link added to queue!",
+        "online_mode_label": "Online Mode",
+        "online_mode_on": "Online Mode: ON",
+        "online_mode_off": "Online Mode: OFF",
+        "online_mode_subtitle": "Listen exclusively to web links (YT/SC) with no local library.",
+        "online_mode_title": f"{Icons.GLOBE} WEB-ONLY RADIO"
     },
     "hu": {
         "system_sync": f"{Icons.SYNC} CSATLAKOZÁS",
@@ -196,7 +202,8 @@ LOCALES = {
         "standby_subtitle": "Válassz egy szobát, ahol hallgatni szeretnéd a rádiót.",
         "now_playing": "MOST SZÓL",
         "paused": "SZÜNETEL",
-        "idle": "ADÁSSZÜNET",
+        "idle": "IDLE (ÜRESJÁRAT)",
+        "stopped": "LEÁLLÍTVA",
         "presence_listening": "Hallgatja:",
         "presence_paused": "Megállítva",
         "artist": "Előadó",
@@ -376,7 +383,12 @@ LOCALES = {
         "weblink_input_label": "YouTube / SoundCloud URL",
         "weblink_processing": "Link feldolgozása, kis türelmet...",
         "weblink_error": "Érvénytelen vagy nem támogatott link!",
-        "weblink_added": "Link hozzáadva a várólistához!"
+        "weblink_added": "Link hozzáadva a várólistához!",
+        "online_mode_label": "Online Mód",
+        "online_mode_on": "Online Mód: BE",
+        "online_mode_off": "Online Mód: KI",
+        "online_mode_subtitle": "Hallgass kizárólag webes linkeket (YT/SC) adatbázis nélkül.",
+        "online_mode_title": f"{Icons.GLOBE} WEB-RÁDIÓ ÜZEMMÓD"
     }
 }
 _radio_ref = None
