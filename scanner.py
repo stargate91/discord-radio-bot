@@ -109,8 +109,7 @@ def extract_tags(file_path: Path, config=None):
                 "date": ["date", "DATE", "year", "YEAR", "TDRC"],
                 "label": ["organization", "ORGANIZATION", "TPUB"],
                 "catnum": ["catalognumber", "CATALOGNUMBER", "TXXX:CATALOGNUMBER"],
-                "mediatype_flac": ["mediatype", "MEDIATYPE"],
-                "mediatype_mp3": ["TMED"],
+                "mediatype": ["mediatype", "MEDIATYPE", "TMED"],
                 "rating": ["rating", "RATING", "POPM"]
             }
             keys = mapping.get(field_name, [])
@@ -124,8 +123,7 @@ def extract_tags(file_path: Path, config=None):
     date = find_tag("date")
     label = find_tag("label")
     catnum = find_tag("catnum")
-    mediatype_flac = find_tag("mediatype_flac")
-    mediatype_mp3 = find_tag("mediatype_mp3")
+    mediatype = find_tag("mediatype")
     rating = find_tag("rating")
     duration = int(audio.info.length) if audio.info else 0
     return {
@@ -136,8 +134,7 @@ def extract_tags(file_path: Path, config=None):
         "label": label,
         "catnum": catnum,
         "duration": duration,
-        "mediatype_flac": mediatype_flac,
-        "mediatype_mp3": mediatype_mp3,
+        "mediatype": mediatype,
         "rating": safe_int(rating),
         "mtime": int(file_path.stat().st_mtime) if file_path.exists() else 0
     }
@@ -160,8 +157,7 @@ async def process_song(full_path: Path, genre: str, config, db, conn, force=Fals
         "label": tags["label"],
         "catnum": tags["catnum"],
         "duration": tags["duration"],
-        "mediatype_flac": tags["mediatype_flac"],
-        "mediatype_mp3": tags["mediatype_mp3"],
+        "mediatype": tags["mediatype"],
         "rating": tags["rating"],
         "mtime": tags["mtime"]
     })

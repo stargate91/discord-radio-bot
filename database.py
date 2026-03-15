@@ -27,8 +27,7 @@ class DatabaseManager:
                 catnum TEXT,
                 genre TEXT,
                 duration INTEGER,
-                mediatype_flac TEXT,
-                mediatype_mp3 TEXT,
+                mediatype TEXT,
                 rating INTEGER DEFAULT 0,
                 play_count INTEGER DEFAULT 0,
                 last_played INTEGER DEFAULT 0,
@@ -154,9 +153,9 @@ class DatabaseManager:
         await db.execute("""
         INSERT INTO songs (
             path, artist, title, album, date, label, catnum, genre,
-            duration, mediatype_flac, mediatype_mp3, rating, mtime
+            duration, mediatype, rating, mtime
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(path) DO UPDATE SET
             artist=excluded.artist,
             title=excluded.title,
@@ -166,14 +165,13 @@ class DatabaseManager:
             catnum=excluded.catnum,
             genre=excluded.genre,
             duration=excluded.duration,
-            mediatype_flac=excluded.mediatype_flac,
-            mediatype_mp3=excluded.mediatype_mp3,
+            mediatype=excluded.mediatype,
             rating=excluded.rating,
             mtime=excluded.mtime
         """, (
             data["path"], data["artist"], data["title"], data["album"],
             data["date"], data["label"], data["catnum"], data["genre"],
-            data["duration"], data["mediatype_flac"], data["mediatype_mp3"],
+            data["duration"], data["mediatype"],
             data["rating"], data.get("mtime", 0)
         ))
         return db.total_changes > 0

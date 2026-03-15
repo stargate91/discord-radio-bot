@@ -698,7 +698,7 @@ class NowPlayingView(BaseView):
             info_lines.append(f"**{t('label')}:** {song.get('label', 'Unknown')}")
             if not is_external:
                 info_lines.append(f"**{t('catnum')}:** {song.get('catnum', 'Unknown') or 'Unknown'}")
-                info_lines.append(f"**{t('source')}:** {song.get('mediatype_flac') or song.get('mediatype_mp3') or 'Unknown'}")
+                info_lines.append(f"**{t('source')}:** {song.get('mediatype') or 'Unknown'}")
             info_lines.append(f"**{t('play_count_label')}:** {song.get('play_count', 0)}")
             last_played = song.get('last_played')
             if last_played:

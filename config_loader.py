@@ -36,8 +36,7 @@ class Config:
             "date": ["date", "DATE", "year", "YEAR", "TDRC"],
             "label": ["organization", "ORGANIZATION", "TPUB"],
             "catnum": ["catalognumber", "CATALOGNUMBER", "TXXX:CATALOGNUMBER"],
-            "mediatype_flac": ["mediatype", "MEDIATYPE"],
-            "mediatype_mp3": ["TMED"],
+            "mediatype": ["mediatype", "MEDIATYPE", "TMED"],
             "rating": ["rating", "RATING", "POPM"]
         })
         self.locales = scanner # Alias for scanner settings as requested

@@ -61,11 +61,9 @@
                 "CATALOGNUMBER",
                 "TXXX:CATALOGNUMBER"
             ],
-            "mediatype_flac": [
+            "mediatype": [
                 "mediatype",
-                "MEDIATYPE"
-            ],
-            "mediatype_mp3": [
+                "MEDIATYPE",
                 "TMED"
             ],
             "rating": [
