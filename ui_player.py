@@ -73,11 +73,11 @@ class LanguageSelect(discord.ui.Select):
         selected = self.values[0]
         self.radio.language = selected
         self.radio.dispatch(RadioAction.SET_LANGUAGE, selected, user=interaction.user)
-        selected_lang = next((l for l in self.radio.config.languages if l["code"] == selected), None)
-        label = selected_lang["label"] if selected_lang else selected
+        
         await interaction.response.defer(ephemeral=True)
-        try: await interaction.delete_original_response()
-        except: pass
+        
+        if _update_callback:
+            await _update_callback(self.radio.current_song or {})
 
 class UIModeSelect(discord.ui.Select):
 
@@ -100,8 +100,6 @@ class UIModeSelect(discord.ui.Select):
         selected = self.values[0]
         self.radio.is_compact = (selected == "compact")
         await interaction.response.defer(ephemeral=True)
-        try: await interaction.delete_original_response()
-        except: pass
         if _update_callback:
             await _update_callback(self.radio.current_song or {})
 
@@ -167,8 +165,6 @@ class FallbackModeButton(discord.ui.Button):
             self.radio.current_song = None
         
         await interaction.response.defer(ephemeral=True)
-        try: await interaction.delete_original_response()
-        except: pass
         if _update_callback: await _update_callback(self.radio.current_song or {})
 
 class PlayPauseButton(discord.ui.Button):
